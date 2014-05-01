@@ -16,7 +16,7 @@
     返回值将会也是这样一个元组. 在 search 内会用到的只有 display_name, key_word. 
     value, more 这两个信息会一同返回而已
 """
-from gi.repository import Gtk, GObject, Pango
+from gi.repository import Gtk, GObject, Pango, Gdk
 import fuzzy
 
 class SearchWindow(Gtk.Window):
@@ -27,8 +27,16 @@ class SearchWindow(Gtk.Window):
         self.set_keep_above( True)      #置顶
         self.set_size_request(500, 450) #大小
         self.list_current=[  ]
+        #self.set_position( Gtk.Align.CENTER)
 
         self.timeout_id = None
+
+        size = Gdk.Screen.get_default()
+        width=size.get_width( )
+        height= size.get_height( )
+        win_width, win_height = self.get_size( )
+        self.move( width/2 - win_width/2, 30)
+        self.set_decorated( False )
         
 
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -37,10 +45,10 @@ class SearchWindow(Gtk.Window):
         #Entry
         self.entry = Gtk.Entry()
         self.entry.set_text("")
-        self.set_position( Gtk.Align.CENTER)
 
         desc = Pango.FontDescription('monaco 18')
         self.entry.modify_font( desc )
+        self.entry.modify_fg(Gtk.StateFlags.NORMAL, Gdk.color_parse("green"))
 
 
         #listtore
@@ -55,6 +63,9 @@ class SearchWindow(Gtk.Window):
         treeview.append_column(column_text)
         desc = Pango.FontDescription('monaco 11')
         treeview.modify_font( desc )
+
+        treeview.modify_bg(Gtk.StateFlags.NORMAL, Gdk.color_parse("#242529"))
+        treeview.modify_fg(Gtk.StateFlags.NORMAL, Gdk.color_parse("#ffffff"))
 
         # 选择对象
         self.sel = treeview.get_selection( )
@@ -143,7 +154,11 @@ class SearchWindow(Gtk.Window):
         self.liststore.clear( )
         del self.list_current[ : ]
         if patten:
+            index = 0
             for item in self.src_list:
+                if index > 25:
+                    break
+                index += 1
                 if fuzzy.diffuse( patten, item[1] ):
                     self.list_current.append( item )
                     if item[ 0 ]:
@@ -182,10 +197,26 @@ def search( src_list, filter_patten = None ):
 
 if __name__ == "__main__":
     src_list = [
-            "one", "two", "thr", "moo",
-            "one", "two", "thr", "moo",
-            "one", "two", "thr", "moo",
-            "one", "two", "thr", "moo",
-            "one", "two", "thr", "moo",
+[            "one","one","one","one"],
+[            "two","two","two","two"],
+[            "thr","thr","thr","thr"],
+[            "moo","moo","moo","moo"],
+[            "one","one","one","one"],
+[            "two","two","two","two"],
+[            "thr","thr","thr","thr"],
+[            "moo","moo","moo","moo"],
+[            "one","one","one","one"],
+[            "two","two","two","two"],
+[            "thr","thr","thr","thr"],
+[            "moo","moo","moo","moo"],
+[            "one","one","one","one"],
+[            "two","two","two","two"],
+[            "thr","thr","thr","thr"],
+[            "moo","moo","moo","moo"],
+[            "one","one","one","one"],
+[            "two","two","two","two"],
+[            "thr","thr","thr","thr"],
+[            "moo","moo","moo","moo"],
+
             ]
     print search( src_list )

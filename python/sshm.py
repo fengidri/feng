@@ -3,6 +3,7 @@
 import string
 import re
 import os
+import sys
 def list_header(  ):
     for letter in string.uppercase:
         yield letter + '.'
@@ -107,7 +108,10 @@ class _sshm( object ):
 
 
     def select( self ):
-        cmd = raw_input( "\n++Select the remote or Add new remote or Type cmd[rtol, ltor]\n>>")
+        if len( sys.argv )> 1:
+            cmd = sys.argv[ 1 ]
+        else:
+            cmd = raw_input( "\n++Select the remote or Add new remote or Type cmd[rtol, ltor]\n>>")
         self.cmd_header( cmd )
 
     def cmd_header( self, cmd ):
@@ -175,21 +179,25 @@ class _sshm( object ):
         #print color.red(cmd)
         #os.system(cmd)
         env_default = os.environ[ 'HOME' ] + '/Dropbox/flocal.py'
-        set_title='echo  -e "\e]2;%s\a"'  % item.ip
-        os.system(set_title )
 
         cmd =  "sshpass -p '%s' scp -o StrictHostKeyChecking=no -P %s %s %s@%s:/dev/shm/"\
                 % (item.password, item.port, env_default, item.root, item.ip)
 
-        os.system(cmd)
+        res = os.system(cmd)
+        if res >> 8 != 0:
+            print "Fail!!!!!!!!!!!"
+            return 
 
-        cmd =  "sshpass -p '%s' ssh -o StrictHostKeyChecking=no -p %s %s@%s "\
-                % (item.password, item.port, item.root, item.ip)
+
+
+        cmd =  "echo  -e '\e]2;%s\a';sshpass -p '%s' ssh -o StrictHostKeyChecking=no -p %s %s@%s "\
+                % (item.ip, item.password, item.port, item.root, item.ip)
 
         print "User:   %s" % color.blue( item.root )
         print "Addr:   %s" % color.blue( item.ip )
         print "Port:   %s" % color.blue( item.port )
         os.system(cmd)
+        print "c"
 
     def sftp( self ):
         item = self.item
@@ -207,26 +215,7 @@ class _sshm( object ):
 
 if __name__ == "__main__":
     sshm=_sshm( )
-    sshm.sshrc.show_remote( )
+    if len(sys.argv) < 2:
+        sshm.sshrc.show_remote( )
     sshm.select( )
 
-#        regex_param = r"^\[(\w+)\s+(.+)\]"
-#        match = re.search(regex_ip, vim.current.line)
-#        if  match:
-#            param["ip"] =  match.group(1)
-#        else:
-#            return 1
-#        line_nu = vim.current.window.cursor[0]
-#        for line in vim.current.buffer[0: line_nu]:
-#            match = re.search(regex_param, line)
-#            if match:
-#                param[match.group(1)] = match.group(2)
-#    
-#    
-#        command = "xterm -e 'sshpass -p %s ssh -v  %s@%s -p %s'"  % (param["Password"], 
-#                param["Root"], 
-#                param["ip"], 
-#                param["Port"])
-#        os.popen2(command)
-#        vim.command("quit")
-#

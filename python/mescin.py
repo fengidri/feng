@@ -208,7 +208,10 @@ class Project( object ):
         self.cf = yaml.load( open(cfgfile) )
 
     def attr( self, section, attr  ):
-        return self.cf[ section ][ attr ]
+        try:
+            return self.cf[ section ][ attr ]
+        except:
+            return ""
 
     def set( self, section, attr , value ):
         self.cf[ section ][ attr ] = value

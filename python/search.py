@@ -1,6 +1,7 @@
 #encoding:utf8
-from gi.repository import Gtk, GObject, Pango
+from gi.repository import Gtk, GObject, Pango,  Gdk
 import fuzzy
+import time
 
 class SearchWindow(Gtk.Window):
 
@@ -8,6 +9,14 @@ class SearchWindow(Gtk.Window):
         Gtk.Window.__init__(self, title=title)
         self.set_keep_above( True)      #置顶
         self.set_size_request(500, 450) #大小
+        #self.set_position( Gtk.Align.CENTER )
+        size = Gdk.Screen.get_default()
+        width=size.get_width( )
+        height= size.get_height( )
+        win_width, win_height = self.get_size( )
+        self.move( width/2 - win_width/2, 30)
+        self.set_decorated( False )
+
 
         self.timeout_id = None
         
@@ -18,10 +27,10 @@ class SearchWindow(Gtk.Window):
         #Entry
         self.entry = Gtk.Entry()
         self.entry.set_text("")
-        self.set_position( Gtk.Align.CENTER)
 
         desc = Pango.FontDescription('monaco 18')
         self.entry.modify_font( desc )
+        self.entry.modify_fg(Gtk.StateFlags.NORMAL, Gdk.color_parse("green"))
 
 
         #listtore
@@ -36,6 +45,8 @@ class SearchWindow(Gtk.Window):
         treeview.append_column(column_text)
         desc = Pango.FontDescription('monaco 14')
         treeview.modify_font( desc )
+        treeview.modify_bg(Gtk.StateFlags.NORMAL, Gdk.color_parse("#242529"))
+        treeview.modify_fg(Gtk.StateFlags.NORMAL, Gdk.color_parse("#ffffff"))
 
         # 选择对象
         self.sel = treeview.get_selection( )
@@ -78,7 +89,7 @@ class SearchWindow(Gtk.Window):
             try:
                 index = patten.split( " " )[ -1 ]
                 if index.startswith( 'q' ):
-                    self.destroy( )
+                    #self.destroy( )
                     Gtk.main_quit( )
                     return 
 
@@ -94,9 +105,13 @@ class SearchWindow(Gtk.Window):
             return 
 
         self.liststore.clear( )
+        index = 0
         if patten:
             for item in self.src_list:
+                if index > 50:
+                    break
                 if fuzzy.diffuse( patten, item ):
+                    index += 1
                     self.liststore.append( [item] )
         else:
             for item in self.src_list:
@@ -132,12 +147,14 @@ def search( src_list ):
     return res[ -1 ]
 
 
+
 if __name__ == "__main__":
-    src_list = [
-            "one", "two", "thr", "moo",
-            "one", "two", "thr", "moo",
-            "one", "two", "thr", "moo",
-            "one", "two", "thr", "moo",
-            "one", "two", "thr", "moo",
-            ]
-    print search( src_list )
+
+        src_list = [
+                "<red>one</red>", "two", "thr", "moo",
+                "one", "two", "thr", "moo",
+                "one", "two", "thr", "moo",
+                "one", "two", "thr", "moo",
+                "one", "two", "thr", "moo",
+                ]
+        print search( src_list )
