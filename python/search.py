@@ -126,6 +126,8 @@ class SearchWindow(Gtk.Window):
             res = (None, None) 
         else:
             index = list_mode.get_path( list_iter ).get_indices( )[ 0 ]
+            print list_mode
+            print list_mode.get_value( list_iter, 0)
             value = list_mode[ list_iter ][ 0 ]
             res = ( index, value)
         self.res_value.append( res )

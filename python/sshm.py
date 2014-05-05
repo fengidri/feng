@@ -190,7 +190,7 @@ class _sshm( object ):
 
 
 
-        cmd =  "echo  -e '\e]2;%s\a';sshpass -p '%s' ssh -o StrictHostKeyChecking=no -p %s %s@%s "\
+        cmd =  "echo  -e '\e]2;%s\a';sshpass -p '%s' ssh -v -o StrictHostKeyChecking=no -p %s %s@%s "\
                 % (item.ip, item.password, item.port, item.root, item.ip)
 
         print "User:   %s" % color.blue( item.root )

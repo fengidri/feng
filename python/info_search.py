@@ -64,8 +64,8 @@ class SearchWindow(Gtk.Window):
         desc = Pango.FontDescription('monaco 11')
         treeview.modify_font( desc )
 
-        treeview.modify_bg(Gtk.StateFlags.NORMAL, Gdk.color_parse("#242529"))
-        treeview.modify_fg(Gtk.StateFlags.NORMAL, Gdk.color_parse("#ffffff"))
+        #treeview.modify_bg(Gtk.StateFlags.NORMAL, Gdk.color_parse("#242529"))
+        #treeview.modify_fg(Gtk.StateFlags.NORMAL, Gdk.color_parse("#ffffff"))
 
         # 选择对象
         self.sel = treeview.get_selection( )
@@ -158,8 +158,8 @@ class SearchWindow(Gtk.Window):
             for item in self.src_list:
                 if index > 25:
                     break
-                index += 1
                 if fuzzy.diffuse( patten, item[1] ):
+                    index += 1
                     self.list_current.append( item )
                     if item[ 0 ]:
                         self.liststore.append( [item[0]] )

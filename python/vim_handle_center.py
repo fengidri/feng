@@ -1,3 +1,4 @@
+
 #encoding:utf8
 """
  vim_handle_center.
@@ -32,11 +33,33 @@ import socket
 import select 
 import Queue
 import wx_notify
-from vhc_protocol import request, response
+from vhc_protocol import request, response, notify
+import vhc_protocol
 import search
 import info_search
+import os
+import time
 READ_ONLY = ( select.POLLIN | select.POLLPRI | select.POLLHUP | select.POLLERR)
 READ_WRITE = (READ_ONLY|select.POLLOUT)
+Vim_Half = None
+Gui_Half = None
+class _half(  ):
+    def __init__( self ):
+        self.who = "" # vim,GoAnyUi,project
+        self.buf = ""
+        self.sock =None
+
+    def send( self, trans ):
+        print "=======>%s" % self.who
+        self.sock.send( trans.dump_data() )
+
+    def alive( self ):
+        
+        nt = notify( self.who )
+        nt.set_data( vhc_protocol.Alive )
+        self.sock.send( nt.dump_data() )
+
+        
 
 
  
@@ -58,6 +81,28 @@ class vhc( object ):
         #The timeout value is represented in milliseconds, instead of seconds.
         self.timeout = 1000
         self.cons = {  }
+        self.buf = ""
+    def keepalive( self , last_point):
+        global Vim_Half
+        global Gui_Half
+        cur_time = time.time( )
+        if cur_time - last_point < 1:
+            return last_point
+            
+
+        if Vim_Half:
+            try:
+                Vim_Half.alive( )
+            except:
+                Vim_Half = None
+
+        if Gui_Half:
+            try:
+                Gui_Half.alive( )
+            except:
+                #对于VIM 发出结束包的 TODO
+                Gui_Half = None
+        return cur_time
 
 
     def run( self ):
@@ -68,149 +113,130 @@ class vhc( object ):
 
         #Map file descriptors to socket objects
         fd_to_socket = {self.server.fileno():  self.server,}
+        time_point = time.time( )
         while True:
-            events = poller.poll( self.timeout)
+
+            events = poller.poll( self.timeout )
+            time_point = self.keepalive( time_point )
+
             for fd ,flag in  events:
-                s = fd_to_socket[fd]
+                sock = fd_to_socket[fd]
                 if flag & (select.POLLIN | select.POLLPRI) :
-                    if s is self.server :
+                    if sock is self.server :
                         # A readable socket is ready to accept a connection
-                        connection , client_address = s.accept()
-                        print "Connection " , client_address
-                        connection.setblocking(False)
+                        sock_con , client_address = sock.accept()
+                        print "sock_con " , client_address
+                        sock_con.setblocking(False)
                          
-                        fd_to_socket[connection.fileno()] = connection
-                        poller.register(connection,READ_ONLY)
-                        self.cons[ connection ] = Con( connection, poller )
+                        fd_to_socket[sock_con.fileno()] = sock_con
+                        poller.register(sock_con,READ_ONLY)
                     else:
-                        self.cons[ s ].deal( )
+                        self.deal( sock )
 
                 elif flag & select.POLLHUP :
                     #A client that "hang up" , to be closed.
                     print "Closing ", s.getpeername() ,"(HUP)"
-                    poller.unregister(s)
-                    s.close()
+                    poller.unregister(sock)
+                    sock.close()
                 elif flag & select.POLLOUT :
                     #Socket is ready to send data , if there is any to send
                     try:
-                        next_msg = self.message_queues[s].get_nowait()
+                        next_msg = self.message_queues[sock].get_nowait()
                     except Queue.Empty:
                         # No messages waiting so stop checking
-                        print s.getpeername() , " queue empty"
-                        poller.modify(s,READ_ONLY)
+                        poller.modify(sock,READ_ONLY)
                     else :
-                        print " sending %s to %s" % (next_msg , s.getpeername())
-                        s.send(next_msg)
+                        sock.send(next_msg)
                 elif flag & select.POLLERR:
                     #Any events with POLLERR cause the server to close the socket
                     print "  exception on" , s.getpeername()
-                    poller.unregister(s)
-                    s.close()
-                    del self.message_queues[s]
-
-
-class Con:
-    def __init__( self, sock, poller ):
-        self.sock = sock
-        self.fsm_file=""
-        self.fsm_search = ""
-        self.poller = poller
-
-    def request( self, request , param = None):
-        """
-           param 是传递给数据回调的参数 
-        """
-        request_obj = request( request )
-        request_obj.add( "param", param)
-
-        self.sock.send( request_obj.dump_data() )
-
-
-    def filter_patten( self, patten ):
-        if patten.startswith( "@" ):#当前文件中的变量, 函数
-            if self.fsm_search == "local_var_fun":
-                return patten[ 1: ], None
-            else:
-                self.fsm_search = "local_var_fun"
-                return patten
-
-        if patten.startswith( "$" ):#全局的变量函数
-            pass
-    def deal( self):
+                    poller.unregister(sock)
+                    sock.close()
+    def deal( self, sock):
         print "========================:"
-        req = request( )
-        buf = [  ]
-        s = self.sock
-        while True:
-            data = s.recv(1024)
-            buf.append( data )
-            if len(data) != 1024:
-                data = ''.join( buf )
-                break
-        if not data:
-            # Stop listening for input on the connection
-            self.poller.unregister(s)
-            s.close()
-            return 
-            #del message_queues[s]
+        buf = [ self.buf  ]
+
         try:
-            req.init_by_json( data )
+            data = sock.recv(1024)
         except:
-            res.set_status( 404, "json error" )
-            res.send( s )
-            return 
-        self.deal_req( req )
-
-    def send( self, msg ):
-        self.sock.send( msg )
-
-    def deal_req( self, req ):
-        res = response( )
-
-        print req.url( )
-
-        if req.url().startswith("/gui/notify"):
-            notify = req.get( "notify" )
-            wx_notify.notify( notify )
-            self.send( res.dump_data() )
+            print "End"
+            self.poller.unregister(sock)
+            sock.close()
             return 
 
-        if req.url().startswith("/gui/project_select"):
-            project_name  = info_search.search( req.get_data() )
-            res.add_data(  project_name)
-            self.send( res.dump_data() )
+        if not data:
+            print "End...."
+            self.poller.unregister(sock)
+            sock.close()
             return 
 
-        if req.url().startswith("/gui/tag_jump"):
-            tags = req.get( "tags" )
-            tag  = search.search( tags )
-            if tag[ -1 ] == None:
-                res.set_status( 404, "Tag Not Found" )
+        buf.append( data )
+        if len( data ) == 1024:
+            while True:
+                data = sock.recv(1024)
+                buf.append( data )
+                if len(data) != 1024:
+                    break
+
+        data = ''.join( buf )
+        while True:
+            print "try:"
+            req, data = vhc_protocol.get_one_req_from_buf(  data )
+
+            if req:
+                self.deal_trans_data( req , sock)
             else:
-                res.set( "tag", tag)
-            self.send( res.dump_data() )
-            return 
-
-        if req.url().startswith("/gui/localjump"):
-            pos  = info_search.search( req.get_data() )
-            if pos :
-                res.add_data( pos)
-            else:
-                res.set_status( 404, "Pos Not Found" )
-            self.send( res.dump_data() )
-            return 
-        if req.url().startswith("/gui/switch_file"):
-            selected  = info_search.search( req.get_data() )
-            if selected :
-                res.add_data( selected )
-            else:
-                res.set_status( 404, "Not Found" )
-            self.send( res.dump_data() )
-            return 
+                break
+        
+        self.buf = data
+        print self.buf[ -20: ]
 
 
-        res.set_status( 404, "Not Found" )
-        res.send( s )
+    def deal_trans_data( self, trans_data ,sock):
+        global Vim_Half
+        global Gui_Half
+        print trans_data.url( )
+        url = trans_data.url( )
+
+        #if trans_data.url().startswith("/gui/notify"):
+        #    notify = trans_data.get( "notify" )
+        #    wx_notify.notify( notify )
+        #    self.send( res.dump_data() )
+        #    return 
+
+        if url.startswith("/project/select"):
+            res = response( "Vim" )
+            project_name  = info_search.search( trans_data.get_data() )
+            res.set_data(  project_name )
+            sock.send( res.dump_data() )
+            return 
+        else:
+            print trans_data.get_data( )
+
+            if url.startswith( "/GoAnyUi/start" ):
+                os.popen2( " python2 /home/feng/Dropbox/root/lib/python/GoAnyUi.py > /tmp/goany" )
+                pass
+
+            elif url.startswith( "/GoAnyUi" ):
+                if Gui_Half and Gui_Half.who == vhc_protocol.GoAnyUi:
+                    Gui_Half.send(  trans_data )
+
+            elif url.startswith( "/Vim" ):
+                if Vim_Half and Vim_Half.who == vhc_protocol.Vim:
+                    Vim_Half.send(  trans_data )
+
+            elif url.startswith( "/vhc/register/GoAnyUi" ):
+                Gui_Half = _half( )
+                Gui_Half.who = vhc_protocol.GoAnyUi
+                Gui_Half.sock = sock
+
+            elif url.startswith( "/vhc/register/Vim" ):
+                Vim_Half = _half( )
+                Vim_Half.who = vhc_protocol.Vim
+                Vim_Half.sock = sock
+
+
+
 
 
 
