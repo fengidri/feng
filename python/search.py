@@ -1,7 +1,18 @@
 #encoding:utf8
-from gi.repository import Gtk, GObject, Pango,  Gdk
+from gi.repository import Gtk, GObject, Pango,  Gdk, Wnck
 import fuzzy
 import time
+def activate(window):
+    screen = Wnck.Screen.get_default()
+    screen.force_update()
+    for win in screen.get_windows():
+        print win.get_xid( )
+    wnckwin = [win for win in screen.get_windows() ][ -1 ]
+    print wnckwin.get_name( )
+
+    wnckwin.activate(int(time.time()))
+    print wnckwin.is_active( )
+    #wnckwin.activate(Gdk.X11_get_server_time(window.window))
 
 class SearchWindow(Gtk.Window):
 
@@ -16,6 +27,7 @@ class SearchWindow(Gtk.Window):
         win_width, win_height = self.get_size( )
         self.move( width/2 - win_width/2, 30)
         self.set_decorated( False )
+        self.present( )
 
 
         self.timeout_id = None
@@ -145,6 +157,7 @@ def search( src_list ):
     
     win.connect("delete-event", Gtk.main_quit)
     win.show_all()
+    activate( win )
     Gtk.main()
     return res[ -1 ]
 

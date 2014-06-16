@@ -32,10 +32,10 @@ But poll() is not supported under windows .
 import socket
 import select 
 import Queue
-import wx_notify
+#import wx_notify
 from vhc_protocol import request, response, notify
 import vhc_protocol
-import search
+#import search
 import info_search
 import os
 import time
@@ -153,19 +153,19 @@ class vhc( object ):
                     poller.unregister(sock)
                     sock.close()
     def deal( self, sock):
-        print "========================:"
         buf = [ self.buf  ]
 
         try:
             data = sock.recv(1024)
         except:
-            print "End"
+
+            print "Close"
             self.poller.unregister(sock)
             sock.close()
             return 
 
         if not data:
-            print "End...."
+
             self.poller.unregister(sock)
             sock.close()
             return 
@@ -173,14 +173,17 @@ class vhc( object ):
         buf.append( data )
         if len( data ) == 1024:
             while True:
-                data = sock.recv(1024)
+                try:
+                    data = sock.recv(1024)
+                except:
+                    break
                 buf.append( data )
                 if len(data) != 1024:
                     break
 
+        print "Recv Data"
         data = ''.join( buf )
         while True:
-            print "try:"
             req, data = vhc_protocol.get_one_req_from_buf(  data )
 
             if req:
@@ -189,7 +192,6 @@ class vhc( object ):
                 break
         
         self.buf = data
-        print self.buf[ -20: ]
 
 
     def deal_trans_data( self, trans_data ,sock):
@@ -211,10 +213,10 @@ class vhc( object ):
             sock.send( res.dump_data() )
             return 
         else:
-            print trans_data.get_data( )
+
 
             if url.startswith( "/GoAnyUi/start" ):
-                os.popen2( " python2 /home/feng/Dropbox/root/lib/python/GoAnyUi.py > /tmp/goany" )
+                os.popen2( "python2 /home/feng/Dropbox/root/lib/python/GoAnyUi.py > /tmp/goany" )
                 pass
 
             elif url.startswith( "/GoAnyUi" ):

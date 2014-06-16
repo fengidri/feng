@@ -16,10 +16,22 @@
     返回值将会也是这样一个元组. 在 search 内会用到的只有 display_name, key_word. 
     value, more 这两个信息会一同返回而已
 """
-from gi.repository import Gtk, GObject, Pango, Gdk
+from gi.repository import Gtk, GObject, Pango, Gdk, Wnck
 import fuzzy
 import socket
 import vhc_protocol
+import os
+import re
+
+def activate(window):
+    screen = Wnck.Screen.get_default()
+    screen.force_update()
+    for win in screen.get_windows():
+        if win.get_name( ) == "Quick Search":
+            win.activate(int(time.time()))
+            print "activate"
+            return 
+
 
 
 class Con( object ):
@@ -74,7 +86,7 @@ class GoAnyUiWindow(Gtk.Window):
         
         Gtk.Window.__init__(self, title=title)
         self.set_keep_above( True)      #置顶
-        self.set_size_request(500, 450) #大小
+        self.set_size_request(500, 650) #大小
         #self.set_position( Gtk.Align.CENTER)
 
         self.timeout_id = None
@@ -85,6 +97,9 @@ class GoAnyUiWindow(Gtk.Window):
         win_width, win_height = self.get_size( )
         self.move( width/2 - win_width/2, 30)
         self.set_decorated( False )
+
+        self.set_focus_on_map( True )
+        self.set_accept_focus( True )
         
 
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -221,23 +236,26 @@ class GoAnyAnly( GoAnyUiWindow ):
         except:
             pass
         return 
-    def refresh_list( self, patten ):
-        print "patten", patten
+    def refresh_list( self, patten, max_nu = 25 ):
         self.liststore.clear( )
         if patten:
             index = 0
             for item in self.src_list:
-                print "item", item
-                if index > 25:
+                if index > max_nu:
                     break
-                if fuzzy.diffuse( patten, item[1] ):
+                if re.search( patten, item[1] , re.I ):
+                #if fuzzy.diffuse( patten, item[1] ):
                     index += 1
                     if item[ 0 ]:
                         self.liststore.append( [item[0]] )
                     else:
                         self.liststore.append( [item[1]] )
         else:
+            index = 0
             for item in self.src_list:
+                if index > max_nu:
+                    break
+                index += 1
 
                 if item[ 0 ]:
                     self.liststore.append( [item[0]] )
@@ -265,14 +283,58 @@ class GoAny( GoAnyAnly ):
         GoAnyAnly.__init__( self )
         self.con = Con( )
         self.con.register( )
-        self.current_target = "file"
+        self.current_target = "init"  # file, file_fun, file_vars, init
         self.info ={  }
         #self.info_file_fun = None              # @
         #self.info_file_vars = None             # #
         self.file_path = ""
         self.current_file =""
         self.switch_target( )
+            
         self.refresh_list( '' )
+    def switch_target( self ):
+        src_list = self.info.get( 
+                "%s_%s" %(self.file_path, self.current_target)
+                )
+        if src_list:
+            self.src_list = src_list
+        else:
+            url = "/Vim/GoAnyUi/%s" % (self.current_target )
+            req = vhc_protocol.request( url )
+            req.set_data( self.file_path )
+
+            self.con.request( req )
+            res = self.con.waiting( )
+
+            self.src_list = self.info[
+                "%s_%s" %(self.file_path, self.current_target)
+                    ] = res.get_data( )
+
+            cur_file  = res.get_by_key( "current_file" )
+            if cur_file:
+                self.current_file = cur_file
+
+            cur_target  = res.get_by_key( "current_target" )
+            if cur_target:
+                print cur_target
+                self.current_target = cur_target
+
+
+
+        return
+
+    def send_data( self, data ):
+        #对于数据进行过滤, go any 只要有文件名和行号就可以了
+        file_path =None
+        line_nu  = None
+        print self.current_target
+        if self.current_target == "file":
+            file_path = data[ 2 ]
+        else:
+            file_path = self.file_path
+            line_nu = data[ 2 ]
+
+        self.con.send_data(  (file_path, line_nu) )
 
     def filter_patten( self, patten ):
         print patten
@@ -312,52 +374,24 @@ class GoAny( GoAnyAnly ):
             patten = patten.split( "#" )[ 1 ]
             flag = 0
 
-        else:
-            if self.current_target != "file":
-                self.current_target  = "file"
-            file_path = ""
-            flag = 1
+        #else:
+        #    if self.current_target != "file":
+        #        self.current_target  = "file"
+        #    file_path = ""
+        #    flag = 1
 
         if flag == 1 and file_path:
             self.file_path = file_path
             self.switch_target( )
         return patten
 
-    def switch_target( self ):
-        src_list = self.info.get( 
-                "%s_%s" %(self.file_path, self.current_target)
-                )
-        if src_list:
-            self.src_list = src_list
-        else:
-            url = "/Vim/GoAnyUi/%s" % (self.current_target )
-            req = vhc_protocol.request( url )
-            req.set_data( self.file_path )
-            self.con.request( req )
-            res = self.con.waiting( )
-            self.src_list = self.info[
-                "%s_%s" %(self.file_path, self.current_target)
-                    ] = res.get_data( )
-            cur_file  = res.get_by_key( "current_file" )
-            if cur_file:
-                self.current_file = cur_file
-
-        return
-
-    def send_data( self, data ):
-        file_path =None
-        line_nu  = None
-        if self.current_target == "file":
-            file_path = data[ 2 ]
-        else:
-            file_path = self.file_path
-            line_nu = data[ 2 ]
-
-        self.con.send_data(  (file_path, line_nu) )
 
 
 
 
+#def timeout( cmd ):
+#    print "time out"
+#    os.system( cmd )
         
         
 
@@ -370,5 +404,7 @@ if __name__ == "__main__":
     win = GoAny( )
     win.connect("delete-event", Gtk.main_quit)
     win.show_all()
+    #cmd = "xdotool search --name '%s' windowfocus" %  win.get_title( )
+    #GObject.timeout_add(2000, timeout,cmd)
     Gtk.main( )
 

@@ -16,8 +16,10 @@
     返回值将会也是这样一个元组. 在 search 内会用到的只有 display_name, key_word. 
     value, more 这两个信息会一同返回而已
 """
-from gi.repository import Gtk, GObject, Pango, Gdk
+from gi.repository import Gtk, GObject, Pango, Gdk, GObject
 import fuzzy
+import os
+import time
 
 class SearchWindow(Gtk.Window):
 
@@ -181,14 +183,17 @@ class SearchWindow(Gtk.Window):
         
 
 
-
+def timeout( cmd ):
+    print "time out"
+    os.system( cmd )
 
 def search( src_list, filter_patten = None ):
     if src_list == None:
         src_list = [  ]
     res = [ None ]
     win = SearchWindow(src_list, res, filter_patten = filter_patten)
-    
+    cmd = "xdotool search --name '%s' windowfocus" %  win.get_title( )
+    GObject.timeout_add(100, timeout,cmd)
     win.connect("delete-event", Gtk.main_quit)
     win.show_all()
     Gtk.main()
