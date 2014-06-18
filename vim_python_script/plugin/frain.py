@@ -1,10 +1,13 @@
 #encoding:utf8
 import pyvim
+import gatekeeper
 
 from frain_libs import mitems 
 from frain_libs import paths_exp
 from frain_libs import data
 
+
+from frain_libs import project 
 from frain_libs import mescin
 import flog
 
@@ -79,6 +82,38 @@ class PathsExpFind( pyvim.command ):
 
 
 
+class Project( pyvim.command ):
+    def run( self ):
+        #初始化
+        mescin.init( )
+
+        gatekeeper.register( "projects", mescin.Config.get_info_for_select)
+        #请求gui
+        gate = gatekeeper.gatekeeper()
+        gate.request( "/project/select/projects")
+
+        res = gate.response( )
+
+        name = None
+        if res.status() == 200:
+            data = res.get_data( )
+            if data:
+                name = data[ 1 ]
+        if name:
+            cfg, runtime = mescin.Config.get_by_name( name )
+            project.init( cfg, runtime)
+class ProjectSync( pyvim.command ):
+    def run( self ):
+        if not project.Project:
+            return
+        project.Config.sync( )
+
+
+class ProjectEvent( pyvim.events ):
+    def on_VimLeave( self ):
+        if not project.Project:
+            return
+        project.Project.on_close( )
 
 
 

@@ -34,6 +34,8 @@ class Input_Monitor(object):
         #    self.pmenu.set_omnifunc( 'jedi#completions')
 
     def context( self ):
+        if "1" == vim.eval( "g:im_just_wubi" ):
+            return 'wubi', False
         complete_bool = True
         syntax_area =pyvim.syntax_area()
         if imrc.mode == 'muti_change':

@@ -2,6 +2,10 @@
 import os
 import json
 
+home = os.environ[ "HOME" ]
+
+config_dir = os.path.join(home, '.config/mescin')
+runtime_dir = os.path.join( config_dir, '.runtime' )
 
 class _SrcPathConfig( object ):
     def __init__( self, src_path ):
@@ -51,23 +55,39 @@ class ProConfig( _ProConfig ):
 
 # Runtime 信息对象
 class RuntimeConfig( object ):
-    def __init__( self, json_path ):
-        self.name = ""
+    def __init__( self, json_path="", name="" ):
         self.last_opens = ""
-        self.json_path = json_path
-        self.load( json_path )
+        self.sync_time = ""
+        self.name = ""
+        self.json_path = ""
+
+        if name and not json_path:
+            """
+                初始化一个对象, 要提供name
+            """
+            self.name = name
+            self.json_path = os.path.join( runtime_dir, self.name  + ".json")
+            self.sync_time = 0
+        if json_path:
+            """
+                通过json_path 载入一个对象
+            """
+            self.json_path = json_path
+            self.load( json_path )
 
     def load( self, json_path ):
         json_context = open( json_path ).read( )
         json_obj = json.loads( json_context )
 
         self.name = json_obj[ "name" ]
-        self.last_opens = json_obj[ "last_open" ]
+        self.last_opens = json_obj.get( "last_open" ,"")
+        self.sync_time = json_obj.get( "sync_time", 0)
 
     def dumps( self ):
         json_runtime = {  }
         json_runtime[ "name" ] = self.name
         json_runtime[ "last_open" ] = self.last_opens
+        json_runtime[ "sync_time" ] = self.sync_time
         return json_runtime
 
     def save( self ):
@@ -86,9 +106,6 @@ class ProConfigs( object ):
         self.configs = [  ]
         self.runtime = [  ]
         
-        home = os.environ[ "HOME" ]
-
-        config_dir = os.path.join(home, '.config/mescin')
         cfg_files = os.listdir( config_dir )
 
         for cfg_file_name in cfg_files:
@@ -99,14 +116,13 @@ class ProConfigs( object ):
             
             
 
-        runtime_dir = os.path.join( config_dir, '.runtime' )
         runtime_files = os.listdir( runtime_dir )
 
         for runtime_file_name in runtime_files:
             if not runtime_file_name.endswith( ".json" ):
                 continue
             runtime_file_path = os.path.join( runtime_dir, runtime_file_name )
-            self.runtime.append( RuntimeConfig(runtime_file_path) )
+            self.runtime.append( RuntimeConfig(json_path = runtime_file_path) )
 
     def get_by_name( self, name ):
         "get cfg and runtime by name"
@@ -121,7 +137,29 @@ class ProConfigs( object ):
             if runtime.name == name:
                 _runtime = runtime
                 break
+        if _runtime == None and _cfg != None:
+            """
+                有cfg 文件, 但是没有runtime 文件, 初始化一个runtime 对象
+            """
+            _runtime = RuntimeConfig( name = _cfg.name )
         return _cfg, _runtime
+    def get_info_for_select( self ):
+        info = [  ]
+        for cfg in self.configs:
+            if not cfg.src_path:
+                continue
+            name = cfg.name
+            root = cfg.src_path[0].path
+            dispaly = ("%s (%s)" % (name, root))
+
+            info.append( (dispaly, name, None, None) )
+        return info
 
 
 
+Config = None
+def init(  ):
+    global Config
+    if Config:
+        return
+    Config = ProConfigs( )

@@ -1,14 +1,9 @@
 #encoding:utf8
 import vim
 import os
-import sys
-import pyvimrc
-import pyvim
-import scir
-import gatekeeper
 
-import frain_libs.mescin
 import frain_libs.data
+import frain_libs.scir
 
 
 class project( object ):
@@ -20,15 +15,16 @@ class project( object ):
         self.open_lock = False
 
         # 用户配置信息对象
-        self.cfg = None
+        self.cfg = cfg
 
         # 运行状态对象
-        self.runtime = None
+        self.runtime = runtime
+        self.open( )
 
     ############################################################################
     # 打开
     ############################################################################
-    def on_open( self):
+    def open( self):
         if self.open_lock:
             raise "The project opened!"
         self.open_lock = True
@@ -89,70 +85,19 @@ class project( object ):
     # 同步
     ############################################################################
     def sync( self ):
-        pass
+        scir = frain_libs.scir.SCIR( )
+        scir.c_connect( "192.168.72.205", "feng", "idri" )
 
+        for project in self.cfg.src_path:
+            path = project.path
+            remote_path = os.path.join( "sync/%s" % self.cfg.name,
+                        os.path.basename(project.path) )
+            
+            scir.sync( self.runtime.syc_time, path, remote_path )
 
-
-class CompDebug( Oproject ):
-    def __init__( self ):
-        Oproject.__init__( self )
-        self.comp_debug = None
-        self.comp_debug_confirm = False
-
-    def create_scir( self ):
-        if not self.comp_debug_confirm:
-            if self.cfg.submit( ):
-                self.comp_debug_confirm  = True
-            else:
-                return 
-                
-        comp_debug = scir.SCIR( pyvim.stdout()  )
-        comp_debug.init_conf( pyvimrc.comp_debug_conf )
-
-        comp_debug.conf.local_conf( 
-                root= self.cfg.cf['project'][0]['path'], 
-                bin_path = ""
-                )
-        comp_debug.conf.compile_conf( 
-                root= self.cfg.attr('compile', 'root'), 
-                make= self.cfg.attr( 'compile', 'build_cmd' )
-                )
-        comp_debug.conf.install_conf( 
-                root= self.cfg.attr( 'install', 'root' )
-                )
-
-        return comp_debug
-    def build( self ):
-        pyvim.log.info( "build" )
-
-        comp_debug = self.create_scir( )
-        if comp_debug == None:
-            return 0
-        
-        comp_debug.sync( )
-
-
-
-VimProject = CompDebug( )
-
-gatekeeper.register( "projects", mescin.Projects().get_info_for_select)
-
-
-def manage( param='' ):
-    if param == '':
-        
-        gate = gatekeeper.gatekeeper()
-        gate.request( "/project/select/projects")
-
-        project = gate.response( )
-
-        if project.status() == 200:
-            data = project.get_data( )
-            if data:
-                VimProject.open_name( data[1] )
-
-        return 
-
-
-    params = param.split( )
-
+Project = None
+def init( cfg, runtime ):
+    global Project
+    if Project:
+        return
+    Project=project( cfg, runtime )

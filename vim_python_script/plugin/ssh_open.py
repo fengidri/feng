@@ -45,7 +45,7 @@ class ssh_edit( object ):
         vim.command( "edit %s"% local_path )
     def send( self ):
         session = self.connect( )
-        res = session.scp_send( self.local_path, self.remote_path )
+        session.scp_send( self.local_path, self.remote_path )
 
 
 
@@ -64,7 +64,7 @@ class SSHedit( pyvim.command ):
         if not self.params:
             return
         edit.edit( self.params[0] )
-        vim.command( "auto BufWritePost <buffer> SshSend")
+        vim.command( "auto BufWritePost <buffer> SSHsend")
 
 class SSHsend( pyvim.command ):
     def run( self ):
