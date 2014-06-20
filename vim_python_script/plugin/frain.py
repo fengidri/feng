@@ -12,14 +12,6 @@ from frain_libs import mescin
 import flog
 
 
-class FrainOpen( pyvim.command  ):
-    """
-        打开工程选择器. 选择工程并打开
-    """
-    def run( self ):
-        mitems.frain_open_sel( )
-        data.mode = True
-
 
 
 class FrainOpenDir( pyvim.command ):
@@ -102,11 +94,18 @@ class Project( pyvim.command ):
         if name:
             cfg, runtime = mescin.Config.get_by_name( name )
             project.init( cfg, runtime)
+
 class ProjectSync( pyvim.command ):
     def run( self ):
         if not project.Project:
             return
-        project.Config.sync( )
+        project.Project.sync( )
+
+class ProjectSyncAll( pyvim.command ):
+    def run( self ):
+        if not project.Project:
+            return
+        project.Project.sync_all( )
 
 
 class ProjectEvent( pyvim.events ):

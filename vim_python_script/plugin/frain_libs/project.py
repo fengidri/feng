@@ -1,12 +1,16 @@
 #encoding:utf8
 import vim
 import os
+import time
 
 import frain_libs.data
 import frain_libs.scir
+class cfg_api( object ):
+    def clean_sync_time( self ):
+        self.runtime.sync_time = 0
 
 
-class project( object ):
+class project( cfg_api ):
     """
         处理同种的打开, 同步, 关闭
     """
@@ -90,10 +94,23 @@ class project( object ):
 
         for project in self.cfg.src_path:
             path = project.path
-            remote_path = os.path.join( "sync/%s" % self.cfg.name,
-                        os.path.basename(project.path) )
+            if not project.compile_info.path:
+                remote_path = "sync/%s" % self.cfg.name
+            else:
+                remote_path = project.compile_info.path
+            remote_path = os.path.join( remote_path, project.name )
+            remote_path = remote_path.replace( " ", "\\ " )
             
-            scir.sync( self.runtime.syc_time, path, remote_path )
+            scir.sync( self.runtime.sync_time, path, remote_path )
+        self.runtime.sync_time = time.time( )
+
+    def sync_all( self ):
+        """
+            把所有的文件重新sync 一次
+        """
+
+        self.clean_sync_time( )
+        self.sync( )
 
 Project = None
 def init( cfg, runtime ):

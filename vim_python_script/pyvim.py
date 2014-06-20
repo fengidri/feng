@@ -3,13 +3,8 @@
 import os
 import sys
 import re
-#import virtkey
-import pyvimrc
 import logging
 import vim
-#commands={  }
-#event_callback={  }
-#{{{
 vim_events=[ 
         "BufNewFile"		,
         "BufReadPre"		,
@@ -199,191 +194,6 @@ class stdout( object ):
 
 
        
-class class_quick:
-    """
-    quick
-    在功能上与quickfix相似.基本上想在一定程度上取代quickfix
-    功能上的差异:
-             quickfix的输出格式不是很让我满意
-             quickfix的对于绝对目录的依赖不是很让我满意,在一个工程中进行工作是一般
-        有一个根目录的概念,但是quickfix对于这个处理并不好用,同时由于在本地处理远程上
-        的编译输出,就很必要有一个依赖于工程根目录的概念
-    
-    
-    TODO 我发现quickfix可以在源文件进行了修改之后对于定位信息也进行修改,这个目录还没
-    有做到"""
-    def __init__(self):
-        self.quick_win = None
-        self.now_line = 0
-        self.show_win = None
-        self.quick_win = None
-        self.focus = 0
-
-    def pin(self):
-        "pin the window"
-        self.quick_win=None
-    def mode(self, mode='quick'):
-        if mode== 'quick':
-            regex = "^([a-zA-Z_0-9/\.]+):([0-9]+):\s*(.*)"
-        elif mode== 'lint':
-            regex = r"^([a-zA-Z_0-9/\.\\]+)  ([0-9]+)  (.*)"
-        return regex
-
-    def efile(self, file_name_list, mode='quick'):
-        regex= self.mode(mode)
-        self.focus = 0
-        self.items=[]
-        self.items_error = []
-        lens             = [0]
-        warning          = 0
-        error            = 0
-        for file_name in file_name_list:
-            f=open(file_name)
-            lines=f.readlines()
-            f.close()
-
-            for line in lines:
-                match= re.search(regex, line)
-                if match:
-                    e_type = ''
-                    if match.group(3).startswith("warning"):
-                        e_type = 'warning'
-                        warning  += 1
-
-                    if match.group(3).startswith("error"):
-                        e_type = 'error'
-                        error  += 1
-                    lens.append(len(match.group(3)))
-
-                    temp = ([e_type,#有效
-                        match.group(3), #内容
-                        match.group(1).replace('\\', '/'), #文件
-                        int(match.group(2))]) #行号
-                    self.items_error.append(temp)
-                else:
-                    temp = ['des', line] #描述
-                        
-                self.items.append(temp)
-
-        """对齐输出"""
-        max_len = max(lens)
-        for item in self.items_error:
-            item[1]=item[1].ljust(max_len)
-
-        self.error = error
-        self.warning = warning
-        self.win()
-                    
-
-
-    def win(self):
-        """启动quick窗口"""
-
-        w = vim.current.window
-        is_open = 0
-        if self.quick_win:
-            try:
-                vim.current.window = self.quick_win
-                is_open = 1
-            except:
-                is_open = 0
-
-
-        if is_open:
-            del vim.current.buffer[:]
-
-        else:
-            vim.command("botright 9new")
-            vim.current.buffer.options['buftype'] = 'nofile'
-            vim.command( "set ft=pyquick")
-
-            self.quick_win = vim.current.window
-
-
-        vim.current.line = "warning:%s error:%s"  % (self.warning, self.error)
-        for i in self.items:
-            if i[0] == "des":
-                vim.current.buffer.append("||%s"  % i[1])
-            else:
-                vim.current.buffer.append(">>%s @%s@%s"  % (i[1], i[2], i[3]))
-        height = len(vim.current.buffer)
-        if   height <  18:
-            vim.current.window.height = height  + 1
-        else:
-            vim.current.window.height = 18
-    def next(self):
-        nu_start = self.now_line + 1
-        nu_end = len(self.items)
-
-        for i in range(nu_start, nu_end ):
-            item = self.items[i]
-            if len( item ) > 1:
-                self.now_line = i
-
-                self.__open(item[2], item[3])
-                break
-    def open(self):
-        """打开指定的条目"""
-        line = vim.current.line
-        self.now_line = vim.current.window.cursor[0]
-        #vim.command("normal zz")
-        if not line.startswith(">>"):
-            return 0
-        tmp = line.split("@")
-        if len(tmp) < 3:
-            return 0
-        self.__open(tmp[1], int(tmp[2]))
-
-
-
-    def __open(self, path, line_nu):
-        if pyvimrc.Rootpath == '':
-            print ("当前没有工程根目录")
-            return 1
-        file_path = pyvimrc.Rootpath  + '/'   + path
-
-        if not os.path.isfile( file_path ):
-            print ("指定的文件不存在")
-            vim.command("echo '指定的文件不存在'")
-            return 2
-        try:
-            vim.current.window = self.show_win
-        except:
-            w = None
-            for w in vim.windows:
-                if w.buffer.options['buftype'] == 'nofile':
-                    continue
-                break
-            if w !=  None:
-                vim.current.window = w
-            vim.command("new")
-            self.show_win = vim.current.window
-
-
-        vim.command("update")
-
-        vim.command("e %s"  % file_path)
-
-        max_line=len( vim.current.buffer)
-        line_nu = line_nu 
-        if line_nu  >= max_line:
-            line_nu = max_line -1
-
-        line = vim.current.buffer[line_nu]
-        c_n = 0
-        for c in line:
-            if c in ' \t':
-                c_n  += 1
-            else:
-                break
-        vim.current.window.cursor = (line_nu, c_n)
-
-        try:
-            vim.command('%foldopen!')
-        except vim.error, e:
-            pass
-
-        #vim.current.window = self.quick_win
 
 
 
@@ -579,16 +389,6 @@ def current_word( from_vim=True ):
 #如果有错误文件,打开quickfix
 def quickfix(hight = 15):
     vim.command('botright cope %s'  % hight )
-    #if vim.eval( '&ft' ) == 'qf':
-    #    count_error=0
-    #    count_warning = 0
-    #    for line in vim.current.buffer:
-    #        count_error += line.count( 'error' )
-    #        count_warning += line.count( 'warning' )
-
-    #    msg = "Total: Error:%d  Warning:%d" %\
-    #            ( count_error, count_warning )
-    #    vim.current.buffer.append( 0, msg )
 
 
 def quickfix_read_error(error_file):
@@ -748,7 +548,6 @@ def load_plugin( pyplugin_path ):
 
 
 if not __name__=="__main":
-    quick = class_quick()
     get_input=_get_input()
     log=_log()
 
