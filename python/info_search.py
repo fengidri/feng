@@ -160,7 +160,7 @@ class SearchWindow(Gtk.Window):
             for item in self.src_list:
                 if index > 25:
                     break
-                if fuzzy.diffuse( patten, item[1] ):
+                if fuzzy.diffuse( patten, item[1] ) > -1:
                     index += 1
                     self.list_current.append( item )
                     if item[ 0 ]:
@@ -192,8 +192,8 @@ def search( src_list, filter_patten = None ):
         src_list = [  ]
     res = [ None ]
     win = SearchWindow(src_list, res, filter_patten = filter_patten)
-    cmd = "xdotool search --name '%s' windowfocus" %  win.get_title( )
-    GObject.timeout_add(100, timeout,cmd)
+    #cmd = "xdotool search --name '%s' windowfocus" %  win.get_title( )
+    #GObject.timeout_add(100, timeout,cmd)
     win.connect("delete-event", Gtk.main_quit)
     win.show_all()
     Gtk.main()

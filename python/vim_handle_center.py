@@ -135,7 +135,7 @@ class vhc( object ):
 
                 elif flag & select.POLLHUP :
                     #A client that "hang up" , to be closed.
-                    print "Closing ", s.getpeername() ,"(HUP)"
+                    print "Closing ", sock.getpeername() ,"(HUP)"
                     poller.unregister(sock)
                     sock.close()
                 elif flag & select.POLLOUT :
@@ -149,7 +149,8 @@ class vhc( object ):
                         sock.send(next_msg)
                 elif flag & select.POLLERR:
                     #Any events with POLLERR cause the server to close the socket
-                    print "  exception on" , s.getpeername()
+                    print "  exception on" , sock.getpeername()
+
                     poller.unregister(sock)
                     sock.close()
     def deal( self, sock):
@@ -200,11 +201,6 @@ class vhc( object ):
         print trans_data.url( )
         url = trans_data.url( )
 
-        #if trans_data.url().startswith("/gui/notify"):
-        #    notify = trans_data.get( "notify" )
-        #    wx_notify.notify( notify )
-        #    self.send( res.dump_data() )
-        #    return 
 
         if url.startswith("/project/select"):
             res = response( "Vim" )
@@ -216,7 +212,7 @@ class vhc( object ):
 
 
             if url.startswith( "/GoAnyUi/start" ):
-                os.popen2( "python2 /home/feng/Dropbox/root/lib/python/GoAnyUi.py > /tmp/goany" )
+                os.popen2( "python2 /home/feng/Dropbox/root/lib/python/GoAnyUi.py > /tmp/goany 2>&1" )
                 pass
 
             elif url.startswith( "/GoAnyUi" ):

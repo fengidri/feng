@@ -1,10 +1,13 @@
-#include "Python.h"
+#include "python2.7/Python.h"
 
 static PyObject* diffuse( PyObject *self, PyObject *arg)
 {
     char *patten;
     char *string;
     int tmp;
+    int index;
+    int last;
+    int ret;
     if( !PyArg_ParseTuple(arg, "ss", &patten, &string ))
     {
         return NULL;
@@ -13,27 +16,33 @@ static PyObject* diffuse( PyObject *self, PyObject *arg)
     {
         if( strcmp(patten +1, string) )
         {
-            Py_RETURN_TRUE;
+            return (PyObject*)Py_BuildValue("i", 0);
         }
         else
         { 
-            Py_RETURN_FALSE;
+            return (PyObject*)Py_BuildValue("i", -1);
         }
     }
+    ret = 0;
+    index = 0;
+    last = 0;
+
     while( *string )
     {
         tmp = *patten - *string;
         if ( tmp == 32 || tmp == 0 )
         {
             patten++;
+            ret = index - last + ret;
             if ( 0== *patten)
             {
-                Py_RETURN_TRUE;
+                return (PyObject*)Py_BuildValue("i", ret);
             }
         }
         string++;
+        index ++;
     }
-    Py_RETURN_FALSE;
+    return (PyObject*)Py_BuildValue("i", -1);
 
 }
 static PyMethodDef fuzzy_methods[  ] = { 

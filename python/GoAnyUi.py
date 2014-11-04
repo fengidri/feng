@@ -238,29 +238,32 @@ class GoAnyAnly( GoAnyUiWindow ):
         return 
     def refresh_list( self, patten, max_nu = 25 ):
         self.liststore.clear( )
+        items = []
+        index = 0
         if patten:
-            index = 0
             for item in self.src_list:
                 if index > max_nu:
                     break
-                if re.search( patten, item[1] , re.I ):
-                #if fuzzy.diffuse( patten, item[1] ):
+                res = fuzzy.diffuse( patten, item[1] )
+                if res > -1:
                     index += 1
                     if item[ 0 ]:
-                        self.liststore.append( [item[0]] )
+                        items.append( (res, [item[0]]) )
                     else:
-                        self.liststore.append( [item[1]] )
+                        items.append( (res, [item[1]]) )
+            items = sorted(items, key = lambda x:x[0])
         else:
-            index = 0
             for item in self.src_list:
                 if index > max_nu:
                     break
                 index += 1
-
                 if item[ 0 ]:
-                    self.liststore.append( [item[0]] )
+                    items.append( (0, [item[0]]) )
                 else:
-                    self.liststore.append( [item[1]] )
+                    items.append( (0, [item[1]]) )
+
+        for item in items:
+            self.liststore.append( item[1] )
 
         list_iter = self.liststore.get_iter_first( )
         if list_iter:

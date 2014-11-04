@@ -5,8 +5,8 @@ import re
 import os
 import sys
 def list_header(  ):
-    for letter in string.uppercase:
-        yield letter + '.'
+        for letter in string.lowercase + string.uppercase:
+            yield "%s." % (letter)
 
 class color_out:
     def __init__(self):
@@ -39,59 +39,111 @@ class color_out:
 
 color=color_out( )
 
-class item:
+class Item:
+    type_host = "host"
+    type_section = "section"
+
     root='root'
     ip=''
     des=''
     port=22
     password=''
+    type = "host" # host section
+    section_name = ""
+
+    @staticmethod
+    def factory(line):
+        if len(line) < 3:
+            return 
+        line = line.replace("\n", "")
+        tmp = Item( )
+        if line.startswith("["):
+            tmp.type = Item.type_section
+            tmp.section_name = line
+        else:
+            line_split = line.split( )
+            if len(line_split) > 3:
+    
+                tmp.root=line_split[ 0 ]
+                tmp.ip=line_split[ 1 ]
+                tmp.port=int(line_split[ 2 ])
+                tmp.password = line_split[ 3 ]
+    
+            if len(line_split) > 4:
+                tmp.des=' '.join(line_split[ 4: ])
+        return tmp
+
+
 class _sshrc:
     def __init__( self ):
-        self.get_lines( )
-        self.get_items( )
-    def show_remote( self ):
+        
+        self.get_items(self.get_lines( ))
+    def show_list(self, items):
         header = list_header()
         i = 0
-        for item in self.items:
+        section = 0
+        for item in items:
             i = i + 1 
-            context = header.next()+ item.ip.ljust(16)+ str(item.port).ljust(7)+ item.des
+
+            context = None
+            if item.type == Item.type_section:
+                context = header.next() + item.section_name
+                section = 1
+            else:
+                if section:
+                    continue
+                context = header.next()+ item.ip.ljust(16)+ \
+                        str(item.port).ljust(7)+ item.des
+
             if i%2  == 0:
                 context = color.blue(context)
             else:
                 context = color.red(context)
             print context
 
+    def show_all_remote( self ):
+        self.show_list(self.items)
+
+    def show_section(self, section_name):
+        self.show_list(self.get_items_of_section(section_name))
+
+    def get_items_of_section(self, section_name):
+        items = []
+        flag = 0
+        for item in self.items:
+            if item.type == Item.type_section:
+                if flag == 0:
+                    flag = 1
+                    continue
+                if flag == 1:
+                    break
+            if flag != 1:
+                continue
+            items.append(item)
+        return items
+
+
+
     def get_lines( self ):
         sshrc = os.path.join(os.environ[ "HOME" ], ".sshrc")
         f=open( sshrc )
         lines= f.readlines( )
         f.close( )
-        self.lines = lines
         return lines
 
-    def get_items( self ):
+    def get_items( self, lines ):
 
         items=[  ]
 
-        for line in self.lines:
-
-            line= line[ 0:-1 ]
-            tmp = item( )
-            line_split = line.split( )
-            if len(line_split) > 3:
-
-                tmp.root=line_split[ 0 ]
-                tmp.ip=line_split[ 1 ]
-                tmp.port=int(line_split[ 2 ])
-                tmp.password = line_split[ 3 ]
-
-            if len(line_split) > 4:
-                tmp.des=' '.join(line_split[ 4: ])
+        for line in lines:
+            tmp = Item.factory(line)
+            if not tmp:
+                continue
             items.append( tmp )
-
 
         self.items=items
         return items
+
     def get_item( self, index ):
         return self.items[ index ]
 
@@ -101,110 +153,100 @@ class _sshrc:
                 return item
         return None
 
+
+
 class _sshm( object ):
     def __init__( self ):
         self.sshrc= _sshrc( )
-        self.default_cmd = self.ssh
 
 
     def select( self ):
         if len( sys.argv )> 1:
             cmd = sys.argv[ 1 ]
         else:
-            cmd = raw_input( "\n++Select the remote or Add new remote or Type cmd[rtol, ltor]\n>>")
+            cmd = raw_input( "cmd: muti\n>>")
         self.cmd_header( cmd )
 
     def cmd_header( self, cmd ):
         cmd_seq= cmd.split( )
         cmd = cmd_seq[ 0 ]
+        if cmd == "muti":
+            indexs = raw_input(color.green("select host:"))
+            index_list= indexs.split()
+            prefix = color.green(",".join(index_list) + "$")
+            session_list = []
+            for index in index_list:
+                session_list.append(self.get_session(index))
 
-        if cmd == 'exit':
-            return 0
+            while True:
+                cmd = raw_input(prefix)
+                if cmd == "quit" or cmd == "exit":
+                    break
+                for s in session_list:
+                    print color.red("========%s========" % s.host)
+                    s.cmd(cmd)
+                print color.blue("===========================================")
 
-        if cmd == 'del':
-            if len( cmd_seq ) < 2:
-                return -1
-            #TODO
-        if cmd == 'sftp':
-            if len( cmd_seq ) < 2 or len(cmd_seq[1]) > 1:
-                return -1
-            header = cmd_seq[ 1 ]
-            self.default_cmd = self.sftp
-            self.run_cmd( header )
+
+
 
 
         if len( cmd ) == 1:
-            self.run_cmd( cmd )
+            session = self.get_session(cmd)
+            session.session()
 
 
-        if cmd == "rtol":
-            index= cmd_seq[ 1 ]
-            item = self.sshrc.get_item( ord(index) - 97 )
-            print "Local <-- Remote"
-            home =  os.environ[ "HOME" ]
-            local_file = raw_input( "本地文件/目录[%s]:" % home )
-            if local_file == "":
-                local_file= home
-            remote_file = raw_input( "远程文件/目录:" )
-            cmd =  "sshpass -p '%s' scp -r -o StrictHostKeyChecking=no -P %s %s@%s:%s  %s "\
-                % (item.password, item.port, item.root, item.ip, remote_file,
-                        local_file)
-            os.system( cmd )
 
-        if cmd == "ltor":
-            index= cmd_seq[ 1 ]
-            item = self.sshrc.get_item( ord(index) - 97 )
-            print "Local --> Remote"
-            home =  os.environ[ "HOME" ]
-            local_file = raw_input( "本地文件/目录[%s]:"  % home)
-            if local_file == "":
-                local_file= os.environ[ "HOME" ]
+    def get_session(self, index):
+        if index.isupper( ):
+            index = ord(index) - ord('A') + 26
+        else:
+            index = ord(index) - ord('a') 
+        item = self.sshrc.get_item( index )
+        session = Session(item.root, item.password, item.ip, item.port)
+        return session
+        
 
-            remote_file = raw_input( "远程文件/目录:" )
 
-            cmd =  "sshpass -p '%s' scp -r -o StrictHostKeyChecking=no -P %s %s  %s@%s:%s "\
-                % (item.password, item.port, local_file ,item.root, item.ip, 
-                        remote_file)
-            os.system( cmd )
-
-    def run_cmd( self, index ):
-        item = self.sshrc.get_item( ord(index) - 97 )
-        self.item = item
-        self.default_cmd( )
-
-    def ssh( self ):
-        item = self.item
-        #cmd = "sshpass -p '%s' scp -P %s /home/feng/.bashrc  %s@%s:./ "\
-        #        % (item.password, item.port, item.root, item.ip)
-        #print color.red(cmd)
-        #os.system(cmd)
+class Session(object):
+    def __init__(self, user,pwd, host, port=22):
+        self.host = host
+        self.port = port
+        self.password = pwd
+        self.user = user
+    def cmd(self, cmd):
+        cmd =  "sshpass -p '{pwd}' ssh -o \
+ StrictHostKeyChecking=no -p {port} {user}@{host} '{cmd}'".format(
+         pwd = self.password,
+         port = self.port,
+         user = self.user,
+         host = self.host,
+         cmd = cmd
+                )
+        os.system(cmd)
+    def session(self):
         env_default = os.environ[ 'HOME' ] + '/Dropbox/flocal.py'
-
         cmd =  "sshpass -p '%s' scp -o StrictHostKeyChecking=no -P %s %s %s@%s:/dev/shm/"\
-                % (item.password, item.port, env_default, item.root, item.ip)
+                % (self.password, self.port, env_default, self.user, self.host)
 
         res = os.system(cmd)
-        if res >> 8 != 0:
-            print "Fail!!!!!!!!!!!"
-            return 
 
+        cmd =  "echo  -e '\e]2;{host}\a';sshpass -p '{pwd}' ssh  -o \
+        StrictHostKeyChecking=no -p {port} {user}@{host} ".format(
+                pwd = self.password,
+                port = self.port,
+                user = self.user,
+                host = self.host,
+                cmd = cmd
+                )
 
-
-        cmd =  "echo  -e '\e]2;%s\a';sshpass -p '%s' ssh -v -o StrictHostKeyChecking=no -p %s %s@%s "\
-                % (item.ip, item.password, item.port, item.root, item.ip)
-
-        print "User:   %s" % color.blue( item.root )
-        print "Addr:   %s" % color.blue( item.ip )
-        print "Port:   %s" % color.blue( item.port )
+        print "User:   %s" % color.blue( self.user )
+        print "Addr:   %s" % color.blue( self.host )
+        print "Port:   %s" % color.blue( self.port )
         os.system(cmd)
-        print "c"
 
-    def sftp( self ):
-        item = self.item
-        cmd =  "sshpass -p '%s' sftp  -P %s %s@%s "\
-                % (item.password, item.port, item.root, item.ip)
-        print color.red(cmd)
-        os.system(cmd)
+
+
 
 
         
@@ -213,9 +255,9 @@ class _sshm( object ):
 
 
 
-if __name__ == "__main__":
+def main():
     sshm=_sshm( )
     if len(sys.argv) < 2:
-        sshm.sshrc.show_remote( )
+        sshm.sshrc.show_all_remote( )
     sshm.select( )
 
