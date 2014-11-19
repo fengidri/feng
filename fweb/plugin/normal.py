@@ -14,6 +14,7 @@ if sys.getdefaultencoding() != 'utf-8':
     sys.setdefaultencoding('utf-8')
 temp = web.template.render("static/tpl")
 
+name = 'normal'
 class VuiIndex(object):
     def GET(self):
         return temp.vuiprojects()
@@ -98,6 +99,7 @@ class Xclip(object):
     def POST(self):
         Xclip.data = web.input().get("tmp")
         raise web.seeother('/xclip')
+
 class LocalGvim(object):
     def POST(self):
         arg = web.input().get('arg')
@@ -115,10 +117,6 @@ urls = (
         '/local/gvim', LocalGvim
         )
 
-
-if __name__ == "__main__":
-    app = web.application(urls, globals())
-    app.run()
 
 
         

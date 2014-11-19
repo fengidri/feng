@@ -377,7 +377,7 @@ class Itemize( origin_node ):
 class Item( origin_node ):
     def html( self ):
         if self.param:
-            return '\n<li><b>%s</b>' % self.param[0].html()
+            return '\n<li><b>%s</b> &nbsp;&nbsp;&nbsp;&nbsp;' % self.param[0].html()
         return '\n<li>'
 
 class Percent( origin_node ):
@@ -606,8 +606,10 @@ def context2html(contextfile, htmlfile=None):
     f = codecs.open(contextfile, 'r','utf8')
     s = f.read()
     f.close()
+    context2htmls(s)
 
 
+def context2htmls(s, htmlfile=None):
     xlex = _lex(lexicalanalysis( s ))
 
 

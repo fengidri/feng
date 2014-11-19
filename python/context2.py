@@ -324,6 +324,8 @@ class lexicalanalysis:
             self.source.back()
 
 
+
+
     def fsm_scan_source( self ):
         self.change_to_text()
 
@@ -335,6 +337,9 @@ class lexicalanalysis:
             self.fsm[self.status]('\\')
         elif self.status == 'control':
             self.fsm[self.status]('\n')
+
+
+
 
 class node(object):
     def __init__( self, lex ):
@@ -709,13 +714,13 @@ def context2html(contextfile, htmlfile=None):
 
     lex = lexicalanalysis(s)
     print len(lex.wnodes)
-    for w in lex.wnodes:
-        if w.name == 'text':
-            print 'text', w.start, w.end,w.source.gettext(w.start, w.end+1),"|"
-        else:
-            print w.name, w.line, w.col
+    #for w in lex.wnodes:
+    #    if w.name == 'text':
+    #        print 'text', w.start, w.end,w.source.gettext(w.start, w.end+1),"|"
+    #    else:
+    #        print w.name, w.line, w.col
  
-    return
+    #return
     xlex = _lex(lex)
 
 
@@ -738,12 +743,7 @@ if __name__  == '__main__':
              context contexfile  htmlfile
         """
     if len( sys.argv) == 2:
-
         print context2html(sys.argv[1], None)
-
-
-
-
     else:
         context2html(sys.argv[1], sys.argv[2])
 
