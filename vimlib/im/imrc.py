@@ -25,7 +25,7 @@ fa_rule = """
     *            wubi
     Identifier   code
     Statement    code
->svn
+>svn,gitcommit,markdown
     *            wubi
 
 """
