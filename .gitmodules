@@ -1,0 +1,3 @@
+[submodule "fweb/cottle"]
+	path = fweb/cottle
+	url = https://github.com/fengidri/cottle

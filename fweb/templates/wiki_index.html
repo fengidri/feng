@@ -44,11 +44,11 @@
 </div>
 
 <div id='wrap'>
-    {% for f, p in file_list %}
+    % for f, p in file_list: 
         <div id='chapter'>
-            <a href='/wiki/chapters/{{ p  }}'>{{f}}</a>
+            <a href='/fwiki/chapters/{{p}}'>{{f}}</a>
             </div>
-            {%endfor %}
+    %end 
 </div>
 </body>
 </html>

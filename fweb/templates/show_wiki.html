@@ -1,7 +1,7 @@
-<script src='/static/js/jquery.js'></script>
-<script src='/static/index/index.js'></script>
-<script type="text/javascript"  src="/static/prettify/prettify.js"></script>
-<link rel="Stylesheet" type="text/css" href="/static/prettify/prettify.css" />
+<script src='/js/jquery.js'></script>
+<script src='/index/index.js'></script>
+<script type="text/javascript"  src="/prettify/prettify.js"></script>
+<link rel="Stylesheet" type="text/css" href="/prettify/prettify.css" />
 <script>
 $(window).load(function () {
             $("pre").addClass("prettyprint");
@@ -9,7 +9,7 @@ $(window).load(function () {
 })
 </script>
 
-<link rel="stylesheet" type="text/css" href="/static/index/index.css" />
+<link rel="stylesheet" type="text/css" href="/index/index.css" />
 <style>
     *{ 
         margin:0;
@@ -57,7 +57,6 @@ $(window).load(function () {
     { 
         float:right;
         margin-left:20pt;
-        
     }
     #wrap{ 
         padding-top:40px;
@@ -76,12 +75,39 @@ $(window).load(function () {
         margin-top: 1em;
         margin-bottom: 1em;
     }
+    #delete{
+        position:fixed;
+        top:1em;
+        right:2em;
+    }
     input,select{vertical-align:middle;}
 </style>
-<div id=title>{{title}}</div>
+<div id=title>{{!title}}</div>
+<button id=delete >Delete</button>
+<input type=hidden value={{ID}} id=ID>
+
 <div id='index'>
 </div>
 <div id='wrap'>
-{{wiki}}
+{{!wiki}}
 </div>
+<script>
+$('button#delete').click(function(){
+    var ID = $("input#ID").val();
+    if(confirm("Delete!?")){
+        del(ID);
+    }
+});
+
+function del(ID){
+    $.ajax({
+        url: '/fwiki/chapters/' + ID,
+        type: 'DELETE',
+        success: function(result) {
+            alert('Delete OK');
+            location.href='/fwiki/chapters';
+         }
+    });
+}
+</script>
 
