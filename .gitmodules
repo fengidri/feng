@@ -1,3 +1,6 @@
 [submodule "fweb/cottle"]
 	path = fweb/cottle
 	url = https://github.com/fengidri/cottle
+[submodule "fweb/fengidri.github.io"]
+	path = fweb/fengidri.github.io
+	url = http://github.com/fengidri/fengidri.github.io
