@@ -13,14 +13,14 @@ ID = None
 SERVER="localhost"
 class WikiPost(pyvim.command):
     def run(self):
-        title, c = content()
+        title, cls, c = content()
 
         global ID
         if ID:
             print "ID %s. Should WikiPut" % ID 
             ID =  put(title, c)
         else:
-            ID = post(title, c)
+            ID = post(title, c, cls)
         ID = int(ID) 
         print ID
 
@@ -31,11 +31,11 @@ class WikiPut(pyvim.command):
             print "not ID. Should WikiPost" 
             return 
         try:
-            title, c = content()
+            title, cls, c = content()
         except:
             return
 
-        ID =  put(title, c)
+        ID =  put(title, c, cls)
         ID = int(ID) 
         print ID
 
@@ -52,23 +52,31 @@ class WikiGet(pyvim.command):
         ID = _ID
         vim.command("edit %s" % tmp)
 
+def getv(line):
+    return line.split(':')[-1].strip()
+
 
 def content():
         title = ''
+        cls = ''
         for line in vim.current.buffer:
-            if line.startswith('%%') or line[0] != '%':
+            if line.startswith('%%') or len(line) < 2 or line[0] != '%':
                 if not title:
                     print "not find title"
                     return
                 break
 
-            if line.startswith('%') and line.find('title')>-1:
-                title = line.split(':')[-1].strip()
+
+            if line.find('title')>-1:
+                title = getv(line)
+            elif line.find('class')>-1:
+                cls = getv(line)
+
         if not title:
             print "not find title"
             return
         content = '\n'.join(vim.current.buffer)
-        return (title, content)
+        return (title, cls, content)
 def get(ID):
     url = 'http://%s/fwiki/chapters/%s' % (SERVER, ID)
     req = urllib2.Request(url)
@@ -83,13 +91,13 @@ def get(ID):
     if not c:
         print "not content"
         return 
-    open(tmp, 'w').write(c)
+    open(tmp, 'w').write(c.encode('utf8'))
     return tmp
 
 
 
-def post(title, content):
-    j = {'title':title, 'content': content}
+def post(title, content, cls):
+    j = {'title':title, 'content': content, 'class': cls}
     url = 'http://%s/fwiki/chapters' % SERVER
     req = urllib2.Request(url, json.dumps(j));
 

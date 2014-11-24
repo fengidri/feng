@@ -5,13 +5,23 @@
 #    version   :   1.0.1
 import os
 import context
+from cottle import static_file
+import wiki.modules as dw       #data of wiki
+
+STOREPATH = os.path.join(os.getcwd(), 'fengidri.github.io/store')
+WIKIPATH = os.path.join(os.getcwd(), 'fengidri.github.io')
+dw.init(STOREPATH)
+
 name = 'fwiki'
 urls = (
     '/chapters', 'chapters',
     '/chapters/(\d+)', 'chapter',
+    '/(.*)', 'index',
         )
-import wiki.modules as dw       #data of wiki
 
+class index:# 提供静态网页功能
+    def GET(self, filename):
+        return static_file(filename, WIKIPATH)
 
 
 class chapters(object):
@@ -19,7 +29,8 @@ class chapters(object):
         Data = self.forms
         title = Data.get('title')
         content = Data.get('content')
-        res = dw.add(title,  content)
+        cls = Data.get('class', '')
+        res = dw.add(title,  content, cls = cls)
         dw.save()
         return res
 
@@ -58,6 +69,8 @@ class chapter(object):
             f = ''
 
         if c.find('text/json+mkiv') > -1: 
+            if not f:
+                f = 'index.mkiv'
             f = chapter.read(f)
             if not f:
                 self.abort(404)
@@ -88,6 +101,3 @@ class chapter(object):
         dw.save()
         return ID
 
-if __name__ != "__main__":
-    WIKIPATH = os.path.join(os.getcwd(), 'store')
-    dw.init(WIKIPATH)

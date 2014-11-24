@@ -280,7 +280,7 @@ class lexicalanalysis:
 
     def fsm_control(self, char):
         if len(self.cnbuf) == 1 and  char in self.TEX_CHAR:
-            w = wnode(self.source, '\\%s' % char)
+            w = wnode(self.source, '\\%s' % char, self.start)
             self.wnodes.append(w)
             self.change_to_text()
             return
@@ -294,7 +294,7 @@ class lexicalanalysis:
             self.cnbuf.append(char)
             return
 
-        w = wnode(self.source, ''.join(self.cnbuf).strip())
+        w = wnode(self.source, ''.join(self.cnbuf).strip(), self.start)
         self.wnodes.append(w)
         if char == '%':
             self.change_to_comment()
@@ -342,6 +342,7 @@ class lexicalanalysis:
 
 
 class node(object):
+    hasparam = True  # 有没有参数
     def __init__( self, lex ):
         self.sub_node=[  ] #对于section, typing之类的可以有子树的
         self.text=''#用于text类, 用于保存内容
@@ -364,7 +365,8 @@ class origin_node( node ):#控制序列 父类
     endnode = None
     def __init__( self, lex ):
         node.__init__(self, lex)
-        self.get_param( )
+        if self.hasparam:
+            self.get_param( )
     def init_node( self ):
         #对于继承的类的处理的内容放到这个函数中进行
         pass
@@ -388,11 +390,12 @@ class origin_node( node ):#控制序列 父类
                 continue
 
             if next_wnode.wnode_name== '[':
-                self.param += create_quene(self, self.lex, endflag = ']' )
+                self.param.append(create_quene(self, self.lex, endflag = ']' ))
                 continue
 
             if next_wnode.wnode_name== '{':
-                self.sub_node += create_quene( self, self.lex, endflag = '}' )
+                self.sub_node.append(create_quene( self, self.lex, endflag = '}'
+                    ))
                 continue
             break
 
@@ -401,20 +404,22 @@ class origin_node( node ):#控制序列 父类
         self.lex.offset_back( )
         if not self.endnode:
             return
-        self.sub_node = create_quene(self, self.lex, endflag = self.endnode)
+        self.sub_node.append(create_quene(self, self.lex, endflag =
+            self.endnode))
         self.enode = self.lex.wnode( )
 
 
 
 class Text( node ):
     def init_node( self ):
-        self.text = self.lex.wnode( ).content
+        wnode = self.lex.wnode( )
+        self.text = wnode.source.gettext(wnode.start, wnode.end+1)
 
     def node_info( self ):
         print self.text
 
     def html( self ):
-        return  self.text.replace('&', "&amp;" ).replace(  '<', '&lt;' ).replace(  '>', '&gt;')
+        return  self.text.replace('&', "&amp;" ).replace(  '<', '&lt;' ).replace('>', '&gt;')
 
     def plain( self ):
         self.text = re.sub( '\n\s*\n[\n\r\s]*','</p><p>\n', self.text)
@@ -426,7 +431,8 @@ class Section( origin_node ):
 
 
     def sub_html( self ):
-        return ''.join([ obj.plain() for obj in self.sub_node ])
+
+        return ''.join([ obj.html() for obj in self.sub_node[0] ])
 
     def node_info( self ):
         print self,
@@ -435,21 +441,23 @@ class Section( origin_node ):
 
     def html( self ):
 
-        return "<h3>%s</h3>\n" % self.sub_html( )
+        return "\n\n<h3>%s</h3>\n<p>" % self.sub_html( )
         
 
 class Subsection( Section ):
     def html( self ):
-        return "<h4>%s</h4>\n" % self.sub_html( )
+        return "\n\n<h4>%s</h4>\n<p>" % self.sub_html( )
 
 class Subsubsection( Section ):
     def html( self ):
-        return "<h5>%s</h5>\n" % self.sub_html( )
+        return "\n\n<h5>%s</h5>\n<p>" % self.sub_html( )
 
 class Typing( origin_node ):
     endnode = "\stoptyping"
     def html( self ):
-        area_typing = self.lex.source.gettext(self.sub_node[0].start , self.enode.start)
+        print self.enode.start, self.enode.name
+        print self.sub_node[0][0].start
+        area_typing = self.lex.source.gettext(self.sub_node[0][0].start , self.enode.start)
         area_typing = area_typing.replace('&', "&amp;" ).replace(  '<', '&lt;' ).replace(  '>', '&gt;' )
         return "<pre>%s</pre>\n" % area_typing
 
@@ -457,13 +465,11 @@ class Itemize( origin_node ):
     endnode = '\stopitemize'
 
     def html(  self ):
-        tmp = [ '<ul>' ]
+        tmp = [ '</p>\n<ul>' ]
         p_nu = 0 #item之后的第几段
         item_nu = 0 #第几个item
 
-        for node in self.sub_node:
-
-                
+        for node in self.sub_node[0]:
             if node.name == '\item':
                 if item_nu != 0:
                     tmp.append( '</li>' )
@@ -473,7 +479,7 @@ class Itemize( origin_node ):
                 continue
             tmp.append( node.html() )
         if item_nu > 0:
-            tmp.append( '</li></ul>\n' )
+            tmp.append( '</li>\n</ul>\n<p>\n' )
         return ''.join( tmp )
 
 
@@ -492,8 +498,11 @@ class Goto( origin_node ):
     def html( self ):
         if len(self.param)< 2:
             raise Exception("Goto except two args")
-        return "<a href=%s >%s</a>" % (self.param[1].html(),
-                self.param[0].html())
+        h = ''.join([x.html() for x in self.param[1]])
+        #h = self.param[1].html()
+
+        t = ''.join([x.html() for x in self.param[0]])
+        return "<a href=%s >%s</a>" % (h, t)
 class Img( origin_node ):
     def html( self ):
         if len(self.param)< 1:
@@ -549,11 +558,35 @@ class VL(origin_node):
 class VL(origin_node):
     def html( self ):
         return "</td><td>"
+
 class Bold(origin_node):
     def html(self):
         if len(self.sub_node) > 0:
             return "<b>%s</b>" % self.sub_node[0].html()
         return ""
+
+class UnderLine(origin_node):
+    def html(self):
+        return "_"
+
+class Space(origin_node):
+    hasparam =False
+    def init_node( self ):
+        nu = 1
+        while True:
+            wnode = self.lex.next_wnode( )
+            if not wnode:
+                break
+
+            if wnode.wnode_name == ' ':
+                nu += 1
+            else:
+                break
+        self.lex.offset_back( )
+        self.nu = nu
+    def html(self):
+        return " "
+
 
 NODE_MAP={ 
         'text'           : Text,
@@ -564,14 +597,16 @@ NODE_MAP={
         '\startitemize'  : Itemize,
         '\item'          : Item,
         '\goto'          : Goto,
-        '\img'          : Img,
-        '\par'         :Newline,
-        '\starttable'         :starttable,
-        '\stoptable'         :stoptable,
-        '\NC'            :NC,
-        '\VL'            :VL,
-        '\AR'            :AR,
-        '\\bold'            :Bold,
+        '\img'           : Img,
+        '\par'           : Newline,
+        '\starttable'    : starttable,
+        '\stoptable'     : stoptable,
+        '\NC'            : NC,
+        '\VL'            : VL,
+        '\AR'            : AR,
+        '\\bold'         : Bold,
+        '_'              : UnderLine,
+        ' '              : Space,
 
         '%'              : Percent,
         '\n'             : Newline
@@ -605,7 +640,7 @@ class _lex( object ):
     def wnode( self ): #返回当前对象
         return  self.lex[ self.pos ]
 
-    def offset_back( self ):
+    def offset_back(self):
         self.pos -= 1
 
 
@@ -638,10 +673,9 @@ def create_quene(fa, lex, endflag = None ): # 不包含起止节点
         if wnode.wnode_name == endflag:#到达结束flag
             break
 
-        c = NODE_MAP.get( wnode.wnode_name)
+        c = NODE_MAP.get(wnode.wnode_name)
         if c == None:
-            #TODO
-            pass
+            sys.stderr.write("NOT Found:%s\n" % wnode.name)
         else:
             tmp.append( c(lex) )
     return tmp
@@ -693,13 +727,12 @@ def create_trunk( lex ):
         if wnode == None:#历遍完成
             break
         
-        if wnode.paragraph == 1:
-            c = Paragraph 
-        else:
-            c = NODE_MAP.get( wnode.wnode_name)
+        #if wnode.paragraph == 1:
+        #    c = Paragraph 
+        #else:
+        c = NODE_MAP.get(wnode.wnode_name)
         if c == None:
-            #TODO
-            pass
+            print ">>>>>>>>>>>>>>>>>>>>not found:%s" % wnode.wnode_name
         else:
             tmp.append( c(lex) )
     return tmp
@@ -710,18 +743,12 @@ def context2html(contextfile, htmlfile=None):
     f = codecs.open(contextfile, 'r','utf8')
     s = f.read()
     f.close()
+    return context2htmls(s)
 
 
-    lex = lexicalanalysis(s)
-    print len(lex.wnodes)
-    #for w in lex.wnodes:
-    #    if w.name == 'text':
-    #        print 'text', w.start, w.end,w.source.gettext(w.start, w.end+1),"|"
-    #    else:
-    #        print w.name, w.line, w.col
- 
-    #return
-    xlex = _lex(lex)
+
+def context2htmls(s, htmlfile=None):
+    xlex = _lex(lexicalanalysis( s ))
 
 
     trunk = create_trunk( xlex )

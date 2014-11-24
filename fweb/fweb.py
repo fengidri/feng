@@ -71,8 +71,8 @@ else:#uwsgi
     for u,c in URLS:
         logging.info("%s:%s" % (u,c))
     application = app = cottle.cottle.app()
+    app.setroot('static')
     app.mapping.load(tuple(URLS), globals())
-    #cottle.run()
 
 #class application(web.application):
 #    def handle(self):
