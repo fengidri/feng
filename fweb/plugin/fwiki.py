@@ -7,6 +7,7 @@ import os
 import context
 from cottle import static_file
 import wiki.modules as dw       #data of wiki
+import urllib2
 
 STOREPATH = os.path.join(os.getcwd(), 'fengidri.github.io/store')
 WIKIPATH = os.path.join(os.getcwd(), 'fengidri.github.io')
@@ -49,35 +50,35 @@ class chapters(object):
             return self.template("wiki_index", locals())
 
 class chapter(object):
+    def get_filename(self, field):
+        e = self.env.get(field, 'text/html')
+        for tt in e.split(';'):
+            kv = tt.split('=')
+            if len(kv) == 2:
+                k,v = kv
+                if k.strip() == 'filename':
+                    return v.strip()
+        else:
+            return 'index.mkiv'
+
     def GET(self,  Id):
         Id = int(Id)
         chapter = dw.get(Id)
         if not chapter:
             self.abort(404)
+        fn = self.get_filename('HTTP_ACCEPT')
 
         c = self.env.get('HTTP_ACCEPT', 'text/html')
-        for tt in c.split(';'):
-            kv = tt.split('=')
-            if len(kv) == 2:
-                k,v = kv
-                k = k.strip()
-                v = v.strip()
-                if k == 'filename':
-                    f= v
-                    break
-        else:
-            f = ''
-
-        if c.find('text/json+mkiv') > -1: 
-            if not f:
-                f = 'index.mkiv'
-            f = chapter.read(f)
+        if c.find('text/json+mkiv') > -1:# 返回mkiv 文件的内容
+            f = chapter.read(fn)
             if not f:
                 self.abort(404)
             return {'name':chapter.title, 'content': f[1], 'filename':f[0],
                     'ID': Id}
+        elif c.find('text/json+files') > -1:# 返回chapter 的files 信息
+            return chapter.list()
         else:
-            w = context.context2htmls(chapter.read(f)[1].decode('utf8'))
+            w = context.context2htmls(chapter.read(fn)[1].decode('utf8'))
             return self.template("show_wiki", wiki= w, 
                     title =chapter.title, ID=Id)
 
@@ -88,17 +89,43 @@ class chapter(object):
             self.abort(404)
 
         title = self.forms.get('title')
-        content = self.forms.get('content')
-        cls = self.forms.get('cls')
-        chapter.settitle(title)
+        if title:
+            chapter.settitle(title)
+        
+        cls = self.forms.get('class')
+        if cls:
+            chapter.setcls()
+        
+        tag = self.forms.get('tags')
+        if tag:
+            chapter.settag(tag.split(','))
 
-        chapter.write('index.mkiv',  content)
+        #content
+        content = self.forms.get('content')
+        url = self.forms.get('url')
+        if not content and url:# 只在没有content 的情况下检查url
+            if not (url.startswith('http://') or url.startswith('https://')):
+                url = 'http://%s' % url
+            content = urllib2.urlopen(url).read() # 从url 读取数据
+        if content:
+            chapter.write(self.get_filename("HTTP_CONTENT_TYPE"),  content)
+
+
+        fn = self.forms.get('delete')
+        if fn:
+            if not chapter.delfn(fn):
+                self.abort(404)
+
         dw.save()
         return Id
+
     def DELETE(self, Id):
-        ID = dw.delete(int(Id))
-        if not ID:
+        Id = int(Id)
+        chapter = dw.get(Id)
+        if not chapter:
             self.abort(404)
+        chapter.delete()
         dw.save()
         return ID
+
 
