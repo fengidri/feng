@@ -432,7 +432,7 @@ class Section( origin_node ):
 
     def sub_html( self ):
 
-        return ''.join([ obj.html() for obj in self.sub_node[0] ])
+        return  self.sub_node[0].html()
 
     def node_info( self ):
         print self,
@@ -459,7 +459,7 @@ class Typing( origin_node ):
         print self.sub_node[0][0].start
         area_typing = self.lex.source.gettext(self.sub_node[0][0].start , self.enode.start)
         area_typing = area_typing.replace('&', "&amp;" ).replace(  '<', '&lt;' ).replace(  '>', '&gt;' )
-        return "<pre>%s</pre>\n" % area_typing
+        return "<pre>%s</pre>\n<p>" % area_typing
 
 class Itemize( origin_node ):
     endnode = '\stopitemize'
@@ -486,7 +486,7 @@ class Itemize( origin_node ):
 class Item( origin_node ):
     def html( self ):
         if self.param:
-            return '\n<li><b>%s</b>' % self.param[0].html()
+            return '\n<li><b>%s</b>&nbsp;&nbsp;&nbsp;&nbsp;' % self.param[0].html()
         return '\n<li>'
 
 class Percent( origin_node ):
@@ -498,11 +498,9 @@ class Goto( origin_node ):
     def html( self ):
         if len(self.param)< 2:
             raise Exception("Goto except two args")
-        h = ''.join([x.html() for x in self.param[1]])
-        #h = self.param[1].html()
+        return "<a href=%s >%s</a>" % (self.param[1].html(), 
+                self.param[0].html())
 
-        t = ''.join([x.html() for x in self.param[0]])
-        return "<a href=%s >%s</a>" % (h, t)
 class Img( origin_node ):
     def html( self ):
         if len(self.param)< 1:
@@ -661,8 +659,13 @@ class _lex( object ):
 
 
 """
+
+class quene(list):
+    def html(self):
+        return ''.join([x.html() for x in self])
+
 def create_quene(fa, lex, endflag = None ): # 不包含起止节点
-    tmp=[  ]
+    tmp=quene()
 
     while True:
         wnode = lex.next_wnode( )

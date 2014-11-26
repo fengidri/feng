@@ -89,10 +89,11 @@ class chapter(object):
 
         title = self.forms.get('title')
         content = self.forms.get('content')
-        if title == chapter.title:
-            title = 'index.mkiv'
+        cls = self.forms.get('cls')
+        chapter.settitle(title)
 
-        chapter.write(title,  content)
+        chapter.write('index.mkiv',  content)
+        dw.save()
         return Id
     def DELETE(self, Id):
         ID = dw.delete(int(Id))

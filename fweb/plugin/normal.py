@@ -104,7 +104,7 @@ class Xclip(object):
 class LocalGvim(object):
     def POST(self):
         arg = self.forms.get('arg', '')
-        os.popen2('gvim %s' % arg)
+        os.popen2('gvim -c "%s"' % arg)
         return 'OK'
 
 
@@ -115,7 +115,7 @@ urls = (
         "/xclip/(.*)", Xclip,
         "/xclip", Xclip,
        # "/upload", Uploadtest,
-        '/local/gvim', LocalGvim
+        '/gvim', LocalGvim
         )
 
 

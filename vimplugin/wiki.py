@@ -17,8 +17,7 @@ class WikiPost(pyvim.command):
 
         global ID
         if ID:
-            print "ID %s. Should WikiPut" % ID 
-            ID =  put(title, c)
+            ID =  put(title, c, cls)
         else:
             ID = post(title, c, cls)
         ID = int(ID) 
@@ -51,6 +50,10 @@ class WikiGet(pyvim.command):
             return
         ID = _ID
         vim.command("edit %s" % tmp)
+class WikiNew(pyvim.command):
+    def run(self):
+        tmp = tempfile.mktemp(suffix='.mkiv', prefix='fwiki_')
+        vim.command('e %s' % tmp)
 
 def getv(line):
     return line.split(':')[-1].strip()
@@ -81,7 +84,7 @@ def get(ID):
     url = 'http://%s/fwiki/chapters/%s' % (SERVER, ID)
     req = urllib2.Request(url)
     req.add_header('Accept', "text/json+mkiv")
-    tmp = tempfile.mktemp()
+    tmp = tempfile.mktemp(suffix='.mkiv', prefix='fwiki_')
     try:
         res = urllib2.urlopen(req).read()
     except Exception, e:
@@ -104,10 +107,10 @@ def post(title, content, cls):
     req.add_header('Content-Type', "application/json");
     return urllib2.urlopen(req).read()
 
-def put(title, content):
+def put(title, content, cls='', tags=[]):
     if not ID:
         return
-    j = {'title':title, 'content': content}
+    j = {'title':title, 'content': content, 'class': cls}
     url = 'http://%s/fwiki/chapters/%s' % (SERVER, ID)
 
     opener = urllib2.build_opener(urllib2.HTTPHandler)
