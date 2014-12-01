@@ -94,7 +94,7 @@ class chapter(object):
         
         cls = self.forms.get('class')
         if cls:
-            chapter.setcls()
+            chapter.setcls(cls)
         
         tag = self.forms.get('tags')
         if tag:

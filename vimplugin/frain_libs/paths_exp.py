@@ -4,10 +4,7 @@ import mitems
 import os
 import pyvim
 import vim
-import gatekeeper 
-import flog
 import re
-import flog
 
 nodes = [  ]
 win              = None
@@ -101,7 +98,6 @@ class  CNode( object ):
         self.__class__.index = self.index + 1
 
     def open_toggle( self, index_display ):
-        flog.loginfo( "open %s" % self.path)
         if self.type in [ type_dir, type_root ]:
             self.__change_flag( index_display )
             if self.show:
@@ -111,7 +107,6 @@ class  CNode( object ):
             fun( self.index, index_display )
             return
         if self.type != type_file:
-            flog.loginfo( "type error" )
             return
 
         #上下文: 从path exp 窗口回到之前的窗口. 
@@ -121,7 +116,6 @@ class  CNode( object ):
 
         if win == vim.current.window:
             return 
-        flog.loginfo( "open file: %s" % self.path)
         vim.command( "update")
         vim.command( "e %s" % self.path )
 
@@ -183,7 +177,6 @@ def pe_close_dir( index_node, index_display):
             index_node += 1
             if node.type == type_dir and node.show:
                 pe_close_dir( index_node, index_display + 1 )
-            flog.loginfo( "del %s" % node.display )
             del vim.current.buffer[ index_display + 1 ]
 
         elif deep_space <= 0:
@@ -198,14 +191,12 @@ def pe_close_dir( index_node, index_display):
 def refresh_nodes(  ):
     del nodes[ : ]
     paths = mitems.settings.get( "paths" )
-    flog.loginfo( "paths:%s" % paths)
     if not paths:
         return None
 
     CNode.index = 0
     for info in paths:
         path = info.get( "path" )
-        flog.loginfo( "Refresh nodes path:%s" % path)
         if not path:
             continue 
         if not os.path.exists( path ):
@@ -388,9 +379,7 @@ def paths_exp_open( ):
         index_node = line.split( "<|>" )[ 1 ]
         index_node = int( index_node )
     except:
-        flog.loginfo( "NO Index" )
         return
-    flog.loginfo( "index %s" %  index_node )
     nodes[ index_node ].open_toggle( index_display - 1 )
 
 

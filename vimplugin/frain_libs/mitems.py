@@ -5,7 +5,6 @@ from data import settings
 import paths_exp
 import os
 import mescin
-import flog
 
 def frain_open(  ):
     """
@@ -34,7 +33,6 @@ def frain_open_dir( dir_name ):
         paths = settings[ "paths" ]
 
         paths.append( { "path": dir_name } )
-        flog.loginfo( "%s" % settings)
         frain_open( )
 
 
