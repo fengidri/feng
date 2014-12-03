@@ -37,7 +37,7 @@ struct so_setmatched{
  * @patten: 
  * 当subpatten 的数量是0 时, 返回NULL; 结果是动态内存, 注意释放
  */
-struct so_setmatched *compile_patten(const char *patten);
+struct so_setmatched *so_compile_patten(const char *patten);
 
 /**
  * so_subsearchs -- 依赖于已经格式化的set, 查找string 中的substring

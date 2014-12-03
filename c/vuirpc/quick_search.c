@@ -17,6 +17,7 @@
 #include "vuiint.h"
 #include "rstr/sds.h"
 #include "stdlib.h"
+#include "so.h"
 
 #include "gtklist.h"
 
@@ -33,7 +34,7 @@ int list_selected(GtkWidget *list, int column, GValue *buf);
 static void list_info_init(GtkWidget *list, cJSON *json);
 
 struct SortedItem{
-    int sv;//sort value
+    int sv;// 相似度
     void *data;
     void *data1;
 };
@@ -41,127 +42,6 @@ struct SortedItem{
 void qs_set_infos(cJSON *json)
 {
     infos = json;
-}
-
-int diffuse( const char *patten, const char *string)
-{
-    int tmp;
-    int index = 0;
-    int last = 0;
-    int ret = 0;
-    while( *string )
-    {
-        tmp = *patten - *string;
-        if ( tmp == 32 || tmp == 0 )
-        {
-            patten++;
-            ret = index - last + ret;
-            if (0 == *patten)
-            {
-                return  ret;
-            }
-        }
-        string++;
-        index ++;
-    }
-    return  -1;
-}
-
-bool himatch_diffuse(const char *patten, const char *string, sds *buf, int *m)
-{
-    int tmp;
-    int index = 0;
-    int last = 0;
-    sds buffer;
-    buffer = *buf;
-
-    *m = 0;
-    while( *string )
-    {
-        tmp = *patten - *string;
-        if ( tmp == 32 || tmp == 0 )
-        {
-            patten++;
-            *m = index - last + *m;
-            last = index;
-
-            buffer = sdscatprintf(buffer, HI_FMT , *string);
-            if (0 == *patten)
-                *buf = buffer;
-                return  sdscat(buffer, string + 1);
-
-        }
-        else{
-            buffer = sdscatlen(buffer, string, 1);
-        }
-        string++;
-        index ++;
-    }
-    sdsfree(buffer);
-    return  NULL;
-
-}
-
-
-
-const char * strstrcase(const char *src, const char *pat, size_t size)
-{
-    size_t offset;
-    int tmp;
-    const char *p;
-    do{
-        p = pat;
-        offset = 0;
-        do{
-            tmp = *p - *(src + offset);
-            if(0 != tmp && 32 != tmp) break;
-            ++offset;
-            ++p;
-            if (offset >= size) return src;
-        }while(1);
-
-    }while(*src++);
-    return NULL;
-}
-
-bool himatch_key(const char *patten, const char *string, sds *buf, int *m)
-{
-    sds buffer;
-    int size;
-    const char *start, *target, *pos;
-
-    buffer = *buf;
-    pos = patten;
-    *m = 0;
-
-    while(1){// 首先分割patten
-        // 跳过空格
-        while(' ' == *pos && 0 != *pos) pos ++;
-        start = pos;
-        if (0 == *start) {
-            buffer = sdscat(buffer, string);
-            *buf = buffer;
-            return true;// key 全部取完了
-        }
-        // 跳过一般字符
-        while (' ' != *pos && 0 != *pos) pos ++;
-
-        size = pos - start;
-
-        // 在string 中查找关键词
-        target = strstrcase(string, start, size);
-        if (NULL == target) {
-            *buf = buffer;
-            return false; // 没找到
-        }
-
-        *m += target - string;
-        buffer = sdscatlen(buffer, string, target - string);
-        buffer = sdscatprintf(buffer, "<span color='red'>%.*s</span>",
-                size, target);
-        string = target +  size;
-    };
-
 }
 
 static void list_hi_show(GtkTreeViewColumn *col,
@@ -187,21 +67,28 @@ static int getpatten(char *pat, int size, const char *text)
     return 0;
 }
 
+
+/**
+ * compar -- 用于对list中的条目进行排序
+ * @a: 
+ * @b: 
+ */
 static inline int compar(const void *a, const void* b)
 {
     return ((struct SortedItem*)a)->sv - ((struct SortedItem*)b)->sv;
 
 }
 
-static void *filter_patten(char *patten, cJSON *json, int *s)
+static void *filter_patten(struct so_setmatched *set, cJSON *json, int *s)
 {
     struct SortedItem *nf, *si;
-    struct SortedItem **node;
-    const char *filter, *pre,*value;
+    const char *display, *pre,*value;
     unsigned int size, i, m;
-    sds data = NULL;
+    struct so_matched *elem;
+    sds data = NULL;// 保存用于显示在ui上的字符串
     cJSON *item;
     size = cJSON_GetArraySize(json);
+
 
     *s = 0;
     si = nf = (struct SortedItem*)malloc(sizeof(struct SortedItem)*size);
@@ -209,17 +96,37 @@ static void *filter_patten(char *patten, cJSON *json, int *s)
     {
         item  = cJSON_GetArrayItem(infos, i);
 
-        pre   = cJSON_GetArrayItem(item, 0)->valuestring;
-        filter = cJSON_GetArrayItem(item, 1)->valuestring;
+        pre   = cJSON_GetArrayItem(item, 0)->valuestring;//显示的前缀
+        display = cJSON_GetArrayItem(item, 1)->valuestring;//显示的字符
 
-        if (!data)  data = sdsnew(pre);
+        if (!data)  data = sdsnew(pre); //初始data
         else   data = sdscpy(data, pre);
 
-        if (!himatch_key(patten, filter, &data, &si->sv)) continue;
-        si->data = data;
-        data = NULL;
+        //在display 中进行查找
+        if (!so_subsearchs(display, set)) continue;
+        si->sv = 0;
 
+        elem = set->next;
+        while(elem)
+        {
+            si->sv += elem->s - display;// 计算相似度
+            if (elem->match){
+                data = sdscatprintf(data, "<span color='red'>%.*s</span>",
+                        (int)elem->len, elem->s);
+            }
+            else{
+                data = sdscatlen(data, elem->s, elem->len);
+            }
+            elem = elem->next;
+        }
+
+        // 用于显示的字符串
+        si->data = data;
+
+        // 实际有效的值
         si->data1 = cJSON_GetArrayItem(item, 2)->valuestring;
+
+        data = NULL;
         ++si;
         ++*s;
     }
@@ -237,24 +144,34 @@ static void entry_change(GtkWidget *entry, gpointer data){
     static char *fv = NULL;//first value
     char  patten[100];
 
+    struct so_setmatched *set;
+
     list = (GtkWidget*)data;
 
+    // 得到patten
     if (0 != getpatten(patten, sizeof(patten), 
                 gtk_entry_get_text(GTK_ENTRY(entry))))
         return;
-    if (0 == strlen(patten))
+
+    // 根据patten进行过滤
+    set = so_compile_patten(patten);// 行对patten 进行处理
+    if (NULL == set)
     {
         list_info_init(list, infos);
         return;
     }
-    nfree = nf = filter_patten(patten, infos, &size);
-    if (size && nf->data1 != fv)// 只在首选发生变化的时候通知
+    nfree = nf = filter_patten(set, infos, &size);
+    printf("---------\n");
+    free(set); set = NULL;
+    printf("---------\n");
+
+    if (size && nf->data1 != fv)// 只在首选发生变化的时候通知vim
     {
         fv = nf->data1;
         set_code(110, NULL);
         send_replay(fv);
     }
-
+    //设置list的显示条目
     list_clear(list);
     while(size)
     {

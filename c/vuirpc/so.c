@@ -154,6 +154,7 @@ static void match_init(const char *string, struct so_setmatched *set)
     set->next->len = strlen(string);
     set->next->match = false;
     set->next->next = NULL;
+    set->size = 1;
 }
 
 
@@ -252,7 +253,7 @@ success:
  * @patten: 
  * 当subpatten 的数量是0 时, 返回NULL; 结果是动态内存, 注意释放
  */
-struct so_setmatched *compile_patten(const char *patten)
+struct so_setmatched *so_compile_patten(const char *patten)
 {
     struct so_setmatched *set;// 用于保存返回结果
     struct so_pat *subpat;
@@ -318,7 +319,7 @@ bool so_subsearch(const char *string, const char *patten,
         struct so_setmatched **res)
 {
     struct so_setmatched *set;
-    set = compile_patten(patten);
+    set = so_compile_patten(patten);
     if (!set) return false;
 
     if (!so_subsearchs(string, set))

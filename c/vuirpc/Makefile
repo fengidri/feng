@@ -1,6 +1,6 @@
 SrcFiles=$(wildcard rnetwork/ae.c rnetwork/anet.c rnetwork/zmalloc.c  \
 		 cJSON/cJSON.c rlist/*.c rstr/*.c client.c gtklist.c network.c\
-		 quick_search.c vuiint.c vuirpc.c) 
+		 quick_search.c vuiint.c vuirpc.c so.c) 
 Objs=$(SrcFiles:.c=.o)
 Include=-Icjson -Irnetwork -Irstr -Irlist `pkg-config --cflags gtk+-3.0`
 all:$(Objs)
