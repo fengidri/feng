@@ -2,7 +2,7 @@
  *   author       :   丁雪峰
  *   time         :   2014-10-18 09:56:18
  *   email        :   fengidri@yeah.net
- *   version      :   1.0.1
+ *   version      :   1.0.2
  *   description  :   用于判断patten在string中是否存在并返回相关的信息.
  *
  *   patten形如: 如: BB cc Aa Dd.  由空格分开多个subpatten. 
@@ -14,6 +14,9 @@
  *
  *   返回结果: 是多个substring. 这些substring 的顺序与在string 中的顺序是相同的. 
  *
+ *   对于string与patten 的使用, 程序都没有进行字符串的复制. 都是使用指针直接引用
+ *   的.
+ *
  *   当subpatten中有一个不能在string 中找到的情况程序会返回false. 如果subpatten
  *   在string 中的顺序与在patten 中的顺序是相同的时候, 当然如你所愿. 但是当不同
  *   的时候会首先在当前已经分析完并拆分成多段substring中的最后一个substring 中
@@ -21,7 +24,8 @@
  *   substring. 也就说如果string 中只有一个AA. 但是subpatten 中有两个aa. 这时会
  *   被认定为匹配失败.
  *
- *   TODO:
+ *  1.0.2
+ *       完成1.0.1的TODO:
  *        1. 把对于patten 的分析与字符匹配进行分开. 因为可能会在很多场景下使用一
  *        个patten 对于许多string 进行分析.
  *
@@ -34,22 +38,8 @@
 #include <stdbool.h>
 #include <malloc.h>
 #include <string.h>
-#define LOGINFO(fmt, ...)   printf(fmt  "\n", ## __VA_ARGS__)
 
-// 用于描述在 match_key 的返回结果集中的一个元素. 
-struct so_matched{
-    const char *s;  // 
-    size_t len;     // 元素长度, 这个长度也必然是pat 的长度
-    bool match;     // 是否合符
-    size_t index;   // 结果集中的id
-    const char *p;  // 对应的pat
-};
-struct so_setmatched{
-    size_t size;
-    size_t totle;
-    struct so_matched elems[];
-};
-
+#include "so.h"
 
 
 /**
@@ -60,7 +50,7 @@ struct so_setmatched{
  * @pat: 
  * @size: 
  */
-const char * strstrcase(const char *src, size_t len, 
+static const char * strstrcase(const char *src, size_t len, 
         const char *pat, size_t size)
 {
     size_t offset;
@@ -128,24 +118,42 @@ static inline int countword(const char *pos)
     return index;
 }
 
-struct so_setmatched *match_init(const char *string, const char *patten)
+
+
+
+/**
+ * matched_new -- 在so_matched链表中增加新的节点
+ * @set: 
+ * @m: 
+ */
+static struct so_matched *matched_new(struct so_setmatched *set, struct so_matched *m)
 {
-    struct so_setmatched *set;// 用于保存返回结果
-    int index;
+    struct so_matched *newm, *t;
+    newm = set->mmem + set->size;
+    ++set->size;
 
-    index = countword(patten);// 返回patten 中的key 数量
-    if (!index) return NULL;
-    index = index * 2 + 1;
-    set = (struct so_setmatched *)malloc(sizeof(struct so_setmatched) + 
-            sizeof(struct so_matched) * index);
-    set->totle = index;
-    set->size = 1;
+    t = m->next;
+    m->next = newm;
+    newm->next = t;
 
-    set->elems[0].s = string;
-    set->elems[0].len = strlen(string);
-    set->elems[0].match = false;
-    return set;
+    if (NULL == newm->next) set->mtail = newm;
 
+    return newm;
+}
+
+
+/**
+ * match_init -- 使用string 初始set. 之后才可以使用find_match
+ * @string: 
+ * @set: 
+ */
+static void match_init(const char *string, struct so_setmatched *set)
+{
+    set->next = set->mtail = set->mmem;
+    set->next->s = string;
+    set->next->len = strlen(string);
+    set->next->match = false;
+    set->next->next = NULL;
 }
 
 
@@ -157,95 +165,82 @@ struct so_setmatched *match_init(const char *string, const char *patten)
  *      首先比较最后一个elems 的match是不是true, 如果不就从这个elems 中进行比较.
  *      否则或比较失败就从 
  */
-bool find_match(struct so_setmatched * set, const char *start, const char *end)
+static bool find_match(struct so_setmatched * set, const struct so_pat *pat)
 {
-    unsigned int ss, index;// patten word len
     const char *target;
-    struct so_matched *elem;
+    struct so_matched *elem, *elem1, *elem2;
 
-    ss = end - start;
-    index = set->size -1;
-    elem = set->elems + index;
+    elem = set->mtail;//首先检查链表尾
     if (!elem->match)
     {
-        target = strstrcase(elem->s, elem->len, start, ss);
+        target = strstrcase(elem->s, elem->len, pat->p, pat->len);
+
         if (target) goto success;
         else goto loop;
     }
 loop:
-    for (index=0; index < set->size; ++index)
+    elem = set->next;
+    while(elem)
     {
+        if (!(elem->match || elem == set->mtail)){
+            // 跳过match与最后一个
+            target = strstrcase(elem->s, elem->len, pat->p, pat->len);
+            if (target) goto success;
+        }
 
-        elem = set->elems + index;
-        if (elem->match) continue;
-
-        target = strstrcase(elem->s, elem->len, start, ss);
-
-        if (target) goto success;
+        elem = elem->next;
     }
     return false;
 success:
-    if (ss == elem->len)// 全等
+    if (pat->len == elem->len)// 全等
     {
         LOGINFO("eq all");
         elem->match = true;
-        elem->p = start;
+        elem->p = pat;
     }
-    if (target == elem->s)// 头对齐
+    else if (target == elem->s)// 头对齐
     {
         LOGINFO("eq head");
-        if (index < set->size -1)
-        {
-            memmove(elem + 2, elem + 1,
-                    sizeof(set->elems[0]) * (set->size - 1 - index));
-        }
-        set->size += 1;
 
-        (elem + 1)->match = false;
-        (elem + 1)->len = elem->len - ss;
-        (elem + 1)->s = elem->s + ss;
+        elem1 = matched_new(set, elem);
+
+        elem1->match = false;
+        elem1->len = elem->len - pat->len;
+        elem1->s = elem->s + pat->len;
 
         elem->match = true;
-        elem->len = ss;
-        elem->p = start;
+        elem->p = pat;
+        elem->len = pat->len;
+
     }
-    else if (target + ss == elem->s + elem->len)//尾对齐
+    else if (target + pat->len == elem->s + elem->len)//尾对齐
     {
         LOGINFO("eq tail");
-        if (index < set->size -1)
-        {
-            memmove(elem + 2, elem + 1,
-                    sizeof(set->elems[0]) * (set->size - 1 - index));
-        }
-        set->size += 1;
-        (elem + 1)->match = true;
-        (elem + 1)->len = ss;
-        (elem + 1)->s = target;
-        (elem + 1)->p = start;
+        elem1 = matched_new(set, elem);
 
-        elem->len -= ss;
+        elem1->match = true;
+        elem1->len = pat->len;
+        elem1->s = target;
+        elem1->p = pat;
+
+        elem->len -= pat->len;
     }
     else{// 三断
         LOGINFO("eq mid");
-        if (index < set->size -1)
-        {
+        elem1 = matched_new(set, elem);
 
-            LOGINFO("++++++++++");
-            memmove(elem + 3, elem + 1,
-                    sizeof(set->elems[0]) * (set->size - 1 - index));
-        }
-        set->size += 2;
+        elem1->match = true;
+        elem1->len = pat->len;
+        elem1->s = target;
+        elem1->p = pat;
 
-        (elem + 1)->match = true;
-        (elem + 1)->len = ss;
-        (elem + 1)->s = target;
-        (elem + 1)->p = start;
 
-        (elem + 2)->match = false;
-        (elem + 2)->len = elem->len - ss - (target -  elem->s) ;
-        (elem + 2)->s = target + ss;
+        elem2 = matched_new(set, elem1);
 
-        elem->match = false;
+        elem2->match = false;
+        elem2->len = elem->len - pat->len - (target -  elem->s) ;
+        elem2->s = target + pat->len;
+
         elem->len = target -  elem->s;
 
     }
@@ -253,46 +248,93 @@ success:
 
 }
 /**
+ * analy_patten -- 对于patten 进行分析, 构造so_setmatched 数据结构
+ * @patten: 
+ * 当subpatten 的数量是0 时, 返回NULL; 结果是动态内存, 注意释放
+ */
+struct so_setmatched *compile_patten(const char *patten)
+{
+    struct so_setmatched *set;// 用于保存返回结果
+    struct so_pat *subpat;
+    const char *pos, *start, *end;
+    int index;
+    int total;
+
+    index = countword(patten);// 返回patten 中的key 数量
+    if (0 == index) return NULL;
+
+    total = index * 2 + 1;
+    set = (struct so_setmatched *)malloc(
+            sizeof(struct so_setmatched) + 
+            sizeof(struct so_pat) * index + 
+            sizeof(struct so_matched) * total);
+
+    set->mtotle = total;
+    set->ptotle = index;
+    set->size = 1;
+
+    //注意这里的next与mtail 并没有初始化数据内容. 在使用match_find 之前要初始化
+    set->mmem = (struct so_matched *)(
+            (char *)set + 
+            sizeof(struct so_setmatched) + 
+            sizeof(struct so_pat) * index);
+    set->mtail = set->next = set->mmem;
+
+    subpat = set->subpats;
+    pos = skipspace(patten);
+    while(pos){
+        start = pos;
+        end = skipchar(pos);
+
+        subpat->p = start;
+        subpat->len = end - start;
+        ++subpat;
+
+        pos = skipspace(end);
+    }
+    return set;
+}
+
+bool so_subsearchs(const char *string, struct so_setmatched *set)
+{
+    size_t i;
+    match_init(string, set);
+
+    for (i=0; i < set->ptotle; ++i)
+    {
+        if(!find_match(set,  set->subpats + i)) return false;
+    }
+    return true;
+}
+
+/**
  * match_key -- 依据patten 在string 中查找合符的子字符
  * @string:   源字符串
  * @patten:   模式
  * @res:      OUT 用于返回结果
  * @m:        IN res 的大小 OUT 实际的大小.
  */
-bool match_key(const char *string, const char *patten, 
+bool so_subsearch(const char *string, const char *patten, 
         struct so_setmatched **res)
 {
-    const char *start, *end, *target, *pos;
-    struct so_setmatched *set;// 用于保存返回结果
+    struct so_setmatched *set;
+    set = compile_patten(patten);
+    if (!set) return false;
 
-    set = match_init(string, patten);
-    if (!set)
+    if (!so_subsearchs(string, set))
     {
-        *res = NULL;
+        free(set);
         return false;
     }
-    printf("---------\n");
-
-    pos = skipspace(patten);
-    while(pos){
-        start = pos;
-        end = skipchar(pos);
-        if(!find_match(set, start, end))
-        {// 查找失败
-            free(set);
-            return false;
-        }
-        pos = skipspace(end);
-    };
     *res = set;
     return true;
-
 }
-#define TEST 0
+
 #if TEST
 int main(int argn, char *argv[])
 {
-    struct so_setmatched *res;
+    struct so_setmatched *set;
+    struct so_matched *elem;
     const char *string;
     const char *patten;
     unsigned int i; 
@@ -300,7 +342,7 @@ int main(int argn, char *argv[])
 
     string = argv[1];
     patten = argv[2];
-    r = match_key(string, patten, &res);
+    r = so_subsearch(string, patten, &set);
     printf("string: %s\n", string);
     printf("patten: %s\n", patten);
     if (!r)
@@ -308,15 +350,20 @@ int main(int argn, char *argv[])
         printf("match fiald\n");
         return -1;
     }
-    printf("total:%d\n", res->totle);
-    for (i = 0; i < res->size; ++i)
+    printf("mtotal:%zu size:%zu ptotal:%zu\n", set->mtotle, 
+            set->size, set->ptotle);
+
+    elem = set->next;
+    while(elem)
     {
-        printf("%d:%d  %.*s\n", (res->elems + i)->match,
-                (int)(res->elems + i)->len ,
-                (int)(res->elems + i)->len ,
-                (res->elems + i)->s);
+        printf("%d:%d \t |%.*s|\n", elem->match,
+                (int)elem->len ,
+                (int)elem->len ,
+                elem->s);
+        elem = elem->next;
+
     }
-    free(res);
+    free(set);
 
 
 }
