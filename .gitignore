@@ -1,5 +1,6 @@
 *.py[cod]
 fweb/store/*
+vuirpc_server
 
 # C extensions
 *.so

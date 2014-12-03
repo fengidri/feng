@@ -8,6 +8,8 @@ import socket
 import json
 import re
 import pyvim
+import os
+import time
 #infos = {"type":"tag", "tag":[
 #["vuirpc.h"        , "vuirpc.h"        , "vuirpc.h",        0],
 #["rnetwork/anet.h" , "rnetwork/anet.h" , "rnetwork/anet.h", 0],
@@ -47,7 +49,14 @@ class VuiProctocol(object):
     def __init__(self, host, port):
         
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.connect((host, port))
+        for i in [1,2]:
+            try:
+                self.sock.connect((host, port))
+                break
+            except:
+                os.popen2('vuirpc_server')
+                time.sleep(1)
+
         self.buf = ""
     def _send(self, msg):
         self.sock.send(msg)
@@ -166,9 +175,3 @@ class VuiClient(VuiProctocol):
 
 
 
-#client = VuiClient('127.0.0.1', 7878)
-#client.request("//", infos)
-#res = client.response()
-#print res.code
-#print res.reason
-#print res.msg

@@ -21,7 +21,6 @@
 
 #include "gtklist.h"
 
-#define HI_FMT  "<span color='red'>%c</span>"
 #define true 1
 #define false 0
 
@@ -44,28 +43,28 @@ void qs_set_infos(cJSON *json)
     infos = json;
 }
 
+
+/**
+ * list_hi_show -- list 渲染的回调函数. 这里充许使用markup语法
+ * @col: 
+ * @renderer: 
+ * @model: 
+ * @iter: 
+ * @user_data: 
+ */
 static void list_hi_show(GtkTreeViewColumn *col,
                     GtkCellRenderer   *renderer,
                     GtkTreeModel      *model,
                     GtkTreeIter       *iter,
                     gpointer           user_data)
 {
-  char *value;
-  gtk_tree_model_get(model, iter, 0, &value, -1);
-  g_object_set(renderer, "markup", value,  NULL);
+    char *value;
+    gtk_tree_model_get(model, iter, 0, &value, -1);
+    g_object_set(renderer, "markup", value,  NULL);
 }
 
 
 
-static int getpatten(char *pat, int size, const char *text)
-{
-    int len;
-    len = strlen(text);
-    len  = len < size - 1 ? len :size -1;
-    memcpy(pat, text, len);
-    *(pat + len) = 0;
-    return 0;
-}
 
 
 /**
@@ -79,7 +78,51 @@ static inline int compar(const void *a, const void* b)
 
 }
 
-static void *filter_patten(struct so_setmatched *set, cJSON *json, int *s)
+
+/**
+ * filterdisplay -- 判断display是否合符生成set的patten.并构造用于在list显示的data 
+ * @pre: 
+ * @display: 
+ * @set: 
+ * @m: 
+ */
+static sds filterdisplay(const char *pre, const char *display, 
+        struct so_setmatched *set, int *m)
+{
+    struct so_matched *elem;
+    sds data;
+
+    //在display 中进行查找
+    if (!so_subsearchs(display, set)) return NULL;
+
+    data = sdsnew(pre);
+    *m = 0;
+    elem = set->next;
+    while(elem)
+    {
+        *m += elem->s - display;// 计算相似度
+        if (elem->match){
+            data = sdscatprintf(data, "<span color='red'>%.*s</span>",
+                    (int)elem->len, elem->s);
+        }
+        else{
+            data = sdscatlen(data, elem->s, elem->len);
+        }
+        elem = elem->next;
+    }
+    return data;
+
+}
+
+
+/**
+ * filter_patten -- 对所有的条目进行判断是合符patten. 并排序
+ * @set: 
+ * @json: 
+ * @s: 
+ */
+static struct SortedItem *filter_patten(struct so_setmatched *set, cJSON *json, 
+        int *s)
 {
     struct SortedItem *nf, *si;
     const char *display, *pre,*value;
@@ -89,7 +132,6 @@ static void *filter_patten(struct so_setmatched *set, cJSON *json, int *s)
     cJSON *item;
     size = cJSON_GetArraySize(json);
 
-
     *s = 0;
     si = nf = (struct SortedItem*)malloc(sizeof(struct SortedItem)*size);
     for (i = 0; i < size; ++i)
@@ -98,39 +140,15 @@ static void *filter_patten(struct so_setmatched *set, cJSON *json, int *s)
 
         pre   = cJSON_GetArrayItem(item, 0)->valuestring;//显示的前缀
         display = cJSON_GetArrayItem(item, 1)->valuestring;//显示的字符
+        data = filterdisplay(pre, display, set, &si->sv);
+        if (NULL == data) continue;
 
-        if (!data)  data = sdsnew(pre); //初始data
-        else   data = sdscpy(data, pre);
+        si->data = data; // 用于显示的字符串
+        si->data1 = cJSON_GetArrayItem(item, 2)->valuestring; // 实际有效的值
 
-        //在display 中进行查找
-        if (!so_subsearchs(display, set)) continue;
-        si->sv = 0;
-
-        elem = set->next;
-        while(elem)
-        {
-            si->sv += elem->s - display;// 计算相似度
-            if (elem->match){
-                data = sdscatprintf(data, "<span color='red'>%.*s</span>",
-                        (int)elem->len, elem->s);
-            }
-            else{
-                data = sdscatlen(data, elem->s, elem->len);
-            }
-            elem = elem->next;
-        }
-
-        // 用于显示的字符串
-        si->data = data;
-
-        // 实际有效的值
-        si->data1 = cJSON_GetArrayItem(item, 2)->valuestring;
-
-        data = NULL;
         ++si;
         ++*s;
     }
-    if(data) sdsfree(data);
     qsort(nf, *s, sizeof(struct SortedItem), compar);
     return nf;
 }
@@ -141,29 +159,24 @@ static void entry_change(GtkWidget *entry, gpointer data){
     int size;
     struct SortedItem *nf;
     void *nfree;
+    const char  *patten;
+
     static char *fv = NULL;//first value
-    char  patten[100];
 
     struct so_setmatched *set;
 
     list = (GtkWidget*)data;
 
-    // 得到patten
-    if (0 != getpatten(patten, sizeof(patten), 
-                gtk_entry_get_text(GTK_ENTRY(entry))))
-        return;
-
-    // 根据patten进行过滤
-    set = so_compile_patten(patten);// 行对patten 进行处理
+    patten = gtk_entry_get_text(GTK_ENTRY(entry));
+    set = so_compile_patten(patten);// 先对patten 进行处理
     if (NULL == set)
     {
         list_info_init(list, infos);
         return;
     }
+    // 根据patten进行过滤
     nfree = nf = filter_patten(set, infos, &size);
-    printf("---------\n");
     free(set); set = NULL;
-    printf("---------\n");
 
     if (size && nf->data1 != fv)// 只在首选发生变化的时候通知vim
     {
@@ -232,27 +245,24 @@ static gboolean list_keys(GtkWidget *w,  GdkEventKey *event, gpointer data){
     {
         list_selnext(w);
         return TRUE;
-
     }
     else if (event->keyval == GDK_KEY_k)
     {
         list_selpre(w);
         return TRUE;
-
     }
-
-        return FALSE;
+    return FALSE;
 }
 
 
 static gboolean check_escape(GtkWidget *widget, GdkEventKey *event, gpointer data)
 {
-  if (event->keyval == GDK_KEY_Escape) {
-    gtk_widget_destroy(widget);
-    gtk_main_quit();
-    return TRUE;
-  }
-  return FALSE;
+    if (event->keyval == GDK_KEY_Escape) {
+        gtk_widget_destroy(widget);
+        gtk_main_quit();
+        return TRUE;
+    }
+    return FALSE;
 }
 
 GtkWidget * window_init()

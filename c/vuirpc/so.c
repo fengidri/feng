@@ -53,10 +53,12 @@
 static const char * strstrcase(const char *src, size_t len, 
         const char *pat, size_t size)
 {
+
     size_t offset;
     size_t f;
     int tmp;
     const char *p;
+    if (len < size) return NULL;
     f = 0;
     do{
         p = pat;
@@ -69,7 +71,7 @@ static const char * strstrcase(const char *src, size_t len,
             if (offset >= size) return src  + f;
         }while(1);
         ++f;
-    }while(f < len);
+    }while(f <= len - size);
     return NULL;
 }
 
@@ -195,14 +197,11 @@ loop:
 success:
     if (pat->len == elem->len)// 全等
     {
-        LOGINFO("eq all");
         elem->match = true;
         elem->p = pat;
     }
     else if (target == elem->s)// 头对齐
     {
-        LOGINFO("eq head");
-
         elem1 = matched_new(set, elem);
 
         elem1->match = false;
@@ -216,7 +215,6 @@ success:
     }
     else if (target + pat->len == elem->s + elem->len)//尾对齐
     {
-        LOGINFO("eq tail");
         elem1 = matched_new(set, elem);
 
         elem1->match = true;
@@ -226,8 +224,7 @@ success:
 
         elem->len -= pat->len;
     }
-    else{// 三断
-        LOGINFO("eq mid");
+    else if(target > elem->s && target + pat->len < elem->s + elem->len){// 三断
         elem1 = matched_new(set, elem);
 
         elem1->match = true;
@@ -243,7 +240,9 @@ success:
         elem2->s = target + pat->len;
 
         elem->len = target -  elem->s;
-
+    }
+    else{
+        return false;
     }
     return true;
 
