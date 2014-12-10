@@ -59,135 +59,13 @@ class wnode( object ):
         self.col = source.column_nu
         self.wnode_name = self.name = name
         self.start = start
-        self.end = end
-
-class control_seq( object ):
-    def Enter( self ):
-        self.start = self.lexal.pos
-        del self.buffer[ : ]
-
-    def Leave( self ):
-        control_seq=''.join( self.buffer )
-        tmp = wnode( )
-        tmp.wnode_name = ''.join( self.buffer )
-        tmp.start = self.start 
-        tmp.end = self.lexal.pos
-        self.lexal.wnodes.append( tmp )
-        self.lexal.back( )
-
-    def __init__( self, lexicalanalysis):
-        self.lexal = lexicalanalysis
-        self.buffer = [  ]
-
-    def in_fsm( self ):
-        char = self.lexal.char( )
-
-        if (not char.islower()) and  char != '\\' and (not char.isupper()):
-            self.lexal.status = 'text'
-            return 0
-
-        self.buffer.append( char )
-
-class punc( object ):
-    '''
-    处理特殊符号'%','#','$','&','{','}', '\n','[',']' 
-    对于换行符的处理比较特殊
-    '''
-    def __init__( self, lexicalanalysis):
-        self.lexal = lexicalanalysis
-        self.buffer = [  ]
-    def Enter( self ):
-        self.start = self.lexal.pos
-        del self.buffer[ : ]
-        self.nu_newline = 0
-        self.newline_flag = 0
-    def Leave( self ):
-        if self.newline_flag == 1:
-            wnode_name = 'newline'
-            tmp = wnode( )
-            tmp.wnode_name = wnode_name 
-            tmp.start = self.start 
-            tmp.end = self.lexal.pos
-            self.lexal.wnodes.append( tmp )
-
-
-            if self.nu_newline > 1:
-
-                wnode_name = '\par'
-                tmp = wnode( )
-                tmp.wnode_name = wnode_name 
-                tmp.start = self.start 
-                tmp.end = self.lexal.pos
-                self.lexal.wnodes.append( tmp )
-
-            self.lexal.back( )
+        if end == 0:
+            self.end = start + len(name)
         else:
-            wnode_name = self.buffer[ 0 ]
-            tmp = wnode( )
-            tmp.wnode_name = wnode_name 
-            tmp.start = self.start 
-            tmp.end = self.lexal.pos
-            self.lexal.wnodes.append( tmp )
-    def in_fsm( self ):
-        char = self.lexal.char( )
-
-
-        if char == '\n':
-            self.newline_flag = 1
-        else:
-            self.lexal.status = 'text'
-
-        if self.newline_flag == 1:
-            if char != '\n':
-                self.lexal.status = 'text'
-            else:
-                self.nu_newline += 1
-
-        self.buffer.append( char )
-
-class text( object ):
-    """
-    处理文本
-    """
-    def __init__( self, lexicalanalysis):
-        self.lexal = lexicalanalysis
-        self.start = 0
-        self.start_flag = 1
-    def Enter( self ):
-        self.start = self.lexal.pos
-        self.start_flag = 1
-
-    def Leave( self ):
-        pos = self.lexal.pos
-        if  pos > self.start + 1:
-
-            tmp = wnode( )
-            tmp.content = self.lexal.source[ self.start: pos - 1 ]
-            tmp.wnode_name = 'text'
-            tmp.start = self.start 
-            tmp.end = pos
-            self.lexal.wnodes.append( tmp )
-        self.lexal.back( )
-
-
-    def in_fsm( self ):
-        char = self.lexal.char( )
-
-        if self.start_flag == 1:
-            if char.isspace( ):
-                return 0
-            else:
-                self.start = self.lexal.pos
-                self.start_flag = 0
+            self.end = end
 
 
 
-
-        if char == '\\':
-            self.lexal.status = 'control_seq'
-
-        if char in ['%','#','$','&','{','}', '\n','[',']' ]:
-            self.lexal.status = 'punc'
 
 
 
@@ -294,6 +172,7 @@ class lexicalanalysis:
             self.cnbuf.append(char)
             return
 
+        print ''.join(self.cnbuf).strip(),self.start
         w = wnode(self.source, ''.join(self.cnbuf).strip(), self.start)
         self.wnodes.append(w)
         if char == '%':
@@ -455,9 +334,8 @@ class Subsubsection( Section ):
 class Typing( origin_node ):
     endnode = "\stoptyping"
     def html( self ):
-        print self.enode.start, self.enode.name
-        print self.sub_node[0][0].start
-        area_typing = self.lex.source.gettext(self.sub_node[0][0].start , self.enode.start)
+        print 'TYPING',self.wnode.end + 1, self.enode.start
+        area_typing = self.lex.source.gettext(self.wnode.end + 1 , self.enode.start)
         area_typing = area_typing.replace('&', "&amp;" ).replace(  '<', '&lt;' ).replace(  '>', '&gt;' )
         return "<pre>%s</pre>\n<p>" % area_typing
 
@@ -679,7 +557,8 @@ def create_quene(fa, lex, endflag = None ): # 不包含起止节点
 
         c = NODE_MAP.get(wnode.wnode_name)
         if c == None:
-            sys.stderr.write("NOT Found:%s\n" % wnode.name)
+            sys.stderr.write("NOT Found:%s(%s,%s)\n" % (wnode.name, wnode.line,
+                    wnode.col))
         else:
             tmp.append( c(lex) )
     return tmp
