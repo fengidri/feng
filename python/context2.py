@@ -376,7 +376,7 @@ class Goto( origin_node ):
     def html( self ):
         if len(self.param)< 2:
             raise Exception("Goto except two args")
-        return "<a href=%s >%s</a>" % (self.param[1].html(), 
+        return "&nbsp;<a href=%s >%s</a>&nbsp;" % (self.param[1].html(), 
                 self.param[0].html())
 
 class Img( origin_node ):
