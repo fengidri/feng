@@ -172,7 +172,7 @@ class lexicalanalysis:
             self.cnbuf.append(char)
             return
 
-        print ''.join(self.cnbuf).strip(),self.start
+        #print ''.join(self.cnbuf).strip(),self.start
         w = wnode(self.source, ''.join(self.cnbuf).strip(), self.start)
         self.wnodes.append(w)
         if char == '%':
@@ -314,7 +314,6 @@ class Section( origin_node ):
         return  self.sub_node[0].html()
 
     def node_info( self ):
-        print self,
         for node in self.sub_node:
             node.node_info
 
@@ -348,6 +347,7 @@ class Itemize( origin_node ):
         item_nu = 0 #第几个item
 
         for node in self.sub_node[0]:
+            print node, node.name
             if node.name == '\item':
                 if item_nu != 0:
                     tmp.append( '</li>' )
