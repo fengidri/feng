@@ -10,6 +10,11 @@
 import codecs
 import sys
 
+import logging
+class Config(object):
+    ScanWords = False
+    NodesList = False
+
 
 # 1. 使用split 函数把source 分成多个Word对象, 所有的Word 实例组成Words 实例
 # 2. 依赖于Words 中的Word.type 创建node. 这些node 组成node_tree
@@ -83,7 +88,7 @@ def get_control(source, pos):
     name.append(source.getchar())
 
     source.update()
-    tp = Word.TYPE_CPUNC
+    tp = Word.TYPE_CONTROL
 
     while source.getchar():
         char = source.getchar()
@@ -103,6 +108,7 @@ def get_control(source, pos):
             break
             # 序列结束
     name = ''.join(name)
+
     return Word(tp, length, name, pos)
 
              
@@ -119,15 +125,18 @@ class Words(list):# 对于进行词法分析的结果进行包装, 是语法分�
         return self.source[pos: pos + length]
 
     def get_context_between(self, w1, w2): # 得到两个word 中间的context, 开区间
-        s = w1.pos[2] + w1.lenght
+        s = w1.pos[2] + w1.len
         e = w2.pos[2] 
-        return self.source[s, e]
+        return self.source[s: e]
 
     def find_end_by_name(self, name):
         for index, w in enumerate(self[self.pos:]):
             if w.name() == name:
-                self.pos = self.pos + index + 1
-                return self[self.pos: index + 1]
+                pos = self.pos + index + 1
+                ws = Words(self.source)
+                ws.extend(self[self.pos: pos])
+                self.pos = pos
+                return ws
         else:
             w = self[self.pos]
             msg = "NOT FOUND:%s from %s, %s" % (name, w.pos[0], w.pos[1])
@@ -135,11 +144,23 @@ class Words(list):# 对于进行词法分析的结果进行包装, 是语法分�
 
     def find_same(self, name):
         for index, w in enumerate(self[self.pos:]):
+
+
             if w.name() != name:
-                self.pos = self.pos + index + 1
-                return self[self.pos: index]
+                pos = self.pos + index 
+                break
         else:
-            return []
+            pos = self.pos + index  + 1
+
+        ws = Words(self.source)
+        ws.extend(self[self.pos: pos])
+        self.pos = pos
+        return ws
+
+    def slice(self, start, end):
+        ws = Words(self.source)
+        ws.extend(self[start: end])
+        return ws
 
     def getword(self):
         if self.pos >= len(self):
@@ -203,7 +224,7 @@ def split(src): # 对于src 进行词法分解
 
 def show_word_details(words):
     for w in words:
-        c = w.context()[0:20].strip()
+
         name = w.name()
         if w.type == Word.TYPE_PUNC:
             if name == '\n':
@@ -211,7 +232,7 @@ def show_word_details(words):
             elif name == ' ':
                 name = 'space'
 
-        print "%s|%s,%s|%s" % (name, w.pos[0], w.pos[1], c)
+        print "%s|%s,%s" % (name, w.pos[0], w.pos[1])
 
 
 
@@ -248,13 +269,13 @@ class node_punc(object):
             ws.find_end_by_name('\n')
             self.h =  ''
 
-        if self.name == ' ':
-            ws.find_end_by_name(' ')
+        elif self.name == ' ':
+            ws.find_same(' ')
             self.h =  ' '
 
         elif self.name == '\n':
             if len(ws.find_same('\n')) > 1:
-                self.h = '<br />\n'
+                self.h = "</p>\n\n<p>"
 
             else:
                 self.h = '\n'
@@ -266,8 +287,8 @@ class node_punc(object):
 
         else:
             self.h = self.name
+            ws.update()
 
-        ws.update()
 
     def html(self):
         return self.h
@@ -281,10 +302,10 @@ class node_control(object):
         self.Params = []
         self.Attrs  = []
 
-        list.__init__(self)
+        #list.__init__(self)
         self.word = ws.getword()
-        self._getattrs()
-        self._getparams()
+        self._getattrs(ws)
+        self._getparams(ws)
         self.init(ws)
 
     def init(self, ws):
@@ -292,40 +313,42 @@ class node_control(object):
 
     def html(self):
         return ''
-
     def _getparams(self, ws): # 得到参数, 参数可以有多个, {}
-        while True:
-            ws.update()
-            word = ws.getword()
-
-            name = word.name()
-            if name in ['\n', ' ']:
-                continue
-
-            if name == '{':
-                ps = ws.find_end_by_name('}')
-                p = node_tree(ps[1:-1])
-                self.Params.append(p)
-            else:
-                ws.back()
-                break
+        self.__get_params_or_attrs(ws, '{', '}', self.Params)
 
     def _getattrs(self, ws): # 得到属性, 也可以有多个, []
+        self.__get_params_or_attrs(ws, '[', ']', self.Attrs)
+
+    def __get_params_or_attrs(self, ws, s, e, cb):
+        cr_num = 0
         while True:
             ws.update()
             word = ws.getword()
+            if not word:
+                break
 
             name = word.name()
-            if name in ['\n', ' ']:
-                continue
 
-            if name == '[':
-                ps = ws.find_end_by_name(']')
-                p = node_tree(ps[1:-1])
-                self.Attrs.append(p)
+            # 序列后的空格可以被吃掉,  同样参数后的空格也会被吃掉
+            if name == ' ': continue
+
+            #但是回车只能吃一个空格
+            if name == '\n':
+                if cr_num == 0:
+                    cr_num += 1
+                else:
+                    ws.back()
+                    break
+
+            if name == s:
+                ps = ws.find_end_by_name(e)
+                p = node_tree(ps.slice(1, -1))
+                cb.append(p)
+                cr_num = 0# 一个参数后, 可以再吃一个空格
             else:
                 ws.back()
                 break
+
 
 class Section( node_control ):
     def init(self, ws):
@@ -340,7 +363,7 @@ class Section( node_control ):
             raise LostParamsEx(self.word)
         c = self.Params[0].html()
 
-        h = "\n\n<h%s>%s</h%s>\n" % (level, c, level)
+        h = "</p>\n<h%s>%s</h%s><p>\n" % (level, c, level)
         return h
         
 
@@ -361,8 +384,8 @@ class Typing( node_control ):
 
 class Itemize( node_control ):
     def init(self, ws):
-        items = ws.find_end_by_name("\stopitemize")
-        self.tree = node_tree(items[1:-1])
+        _ws = ws.find_end_by_name("\stopitemize")
+        self.tree = node_tree(_ws.slice(1, -1))
 
     def html(  self ):
         return "\n<ul>\n%s\n</ul>\n" % self.tree.html()
@@ -425,7 +448,36 @@ class Bold(node_control):
 
 class Newline(node_control):
     def html(self):
-        return "<br />\n"
+        return "</p>\n\n<p>"
+
+class DefHandle(node_control):
+    MAPS = {}
+    def init(self, ws):
+        ws.update()
+    def html(self):
+        name = self.word.name()
+        de = self.MAPS.get(name)
+        if not de:
+            raise Exception("Dont kwow: %s" % name)
+        return de.Params[0].html()
+
+class Def(node_control):
+    def init(self, ws):
+        while True:
+            ws.update()
+            word = ws.getword()
+            name = word.name()
+            if name in ['\n', ' ']:
+                continue
+            if word.type == Word.TYPE_CONTROL:
+                self._getattrs(ws)
+                self._getparams(ws)
+                DefHandle.MAPS[name] = self
+                break
+
+    def html(self):
+        return ''
+
 
 NODE_MAP={ 
         '\section'       : Section,
@@ -443,15 +495,18 @@ NODE_MAP={
         '\VL'            : VL,
         '\AR'            : AR,
         '\\bold'         : Bold,
+        '\\def'          : Def
                 }
 
 class node_tree(list):
     def __init__(self, ws):
-        w = None
         while True:
             w = ws.getword()
             if not w:
                 return
+            if Config.ScanWords:
+                msg = "ws.pos:%s word.line:%s  word.name:%s"
+                logging.debug(msg, ws.pos, w.pos[0], w.name())
 
             if w.type == Word.TYPE_PUNC:
                 self.append(node_punc(ws))
@@ -464,35 +519,47 @@ class node_tree(list):
 
             elif w.type == Word.TYPE_CONTROL:
                 callback = NODE_MAP.get(w.name())
-                if callback:
-                    self.append(callback(ws))
-                else:
-                    ws.update()
+                if not callback:
+                    callback = DefHandle
+                self.append(callback(ws))
 
     def html(self):
-        for n in self:
-            print n
-            print "name:%s html:%s" % (
-                    n.word.name().replace('\n', '\\n').replace(' ', '\\ '),
-                    n.html().replace('\n', '\\n').replace(' ', '\\ ')
-                    )
-        return ''
+        if Config.NodesList:
+           for n in self:
+               print n,
+               print "name:%s html:%s line:%s" % (
+                       n.word.name().replace('\n', '\\n').replace(' ', '\\ '),
+                       n.html().replace('\n', '\\n').replace(' ', '\\ '),
+                       n.word.pos[0]
+                       )
+           return ''
 
         h = [n.html() for n in self]
         return ''.join(h)
 
 
-f = codecs.open(sys.argv[1], 'r','utf8')
-s = f.read()
-words = split(s)
-#show_word_details(words)
-print node_tree(words).html()
+logging.basicConfig(level = logging.DEBUG)
+def open_source_to_words(f):
+    f = codecs.open(f, 'r','utf8')
+    return split(f.read())
+
+def savehtml(o, words):
+    f = codecs.open(o, 'w','utf8')
+    f.write(node_tree(words).html())
 
 
-        # end
+def main():
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-i")
+    parser.add_argument("-o")
 
+
+    args = parser.parse_args()
+    savehtml(args.o, open_source_to_words(args.i))
 
 
 if __name__ == "__main__":
+    main()
     pass
 

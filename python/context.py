@@ -395,7 +395,8 @@ class Img( origin_node ):
     def html( self ):
         if len(self.param)< 1:
             raise Exception("Img except one arg(url)")
-        return "<img src=%s >" % (self.param[0].html())
+        print "------------------------------"
+        return "<img data-src=%s >" % (self.param[0].html())
 
 class Par( origin_node ):
     def html( self ):
