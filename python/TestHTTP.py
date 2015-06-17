@@ -6,7 +6,85 @@
 
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 import urlparse
-class TestHTTPHandle(BaseHTTPRequestHandler):
+import socket
+class HTTPRequestHandler(BaseHTTPRequestHandler):
+    index = 0
+    def log_request_(self):
+        print '[%s] >>>>>>>>>>>>>>>>>>>>>>>>>>' % self.__class__.index
+        print self.requestline
+        self.response_header = []
+
+        m = 0
+        for k, v in self.headers.items():
+            m = max(m, len(k))
+
+        for k, v in self.headers.items():
+            print "%s:%s %s" % (k, ' '*(m - len(k)), v)
+        print ''
+        self.__class__.index += 1
+
+    def log_request(self, code=None):
+        print self.protocol_version, code, self.responses[code][0]
+
+    def log_response(self):
+        m = 0
+        for k, v in self.response_header:
+            m = max(m, len(k))
+
+        for k, v in self.response_header:
+            print "%s:%s %s" % (k, ' '*(m - len(k)), v)
+        print ''
+
+
+    def send_header(self, keyword, value):
+        BaseHTTPRequestHandler.send_header(self, keyword, value)
+        self.response_header.append((keyword, value))
+
+
+    def version_string(self):
+        """Return the server software version string."""
+        return 'TestHttp'
+
+    def handle_one_request(self):
+        """Handle a single HTTP request.
+
+        You normally don't need to override this method; see the class
+        __doc__ string for information on how to handle specific HTTP
+        commands such as GET and POST.
+
+        """
+        try:
+            self.raw_requestline = self.rfile.readline(65537)
+            if len(self.raw_requestline) > 65536:
+                self.requestline = ''
+                self.request_version = ''
+                self.command = ''
+                self.send_error(414)
+                return
+            if not self.raw_requestline:
+                self.close_connection = 1
+                return
+            if not self.parse_request():
+                # An error code has been sent, just exit
+                return
+            mname = 'do_' + self.command
+            if not hasattr(self, mname):
+                self.send_error(501, "Unsupported method (%r)" % self.command)
+                return
+            method = getattr(self, mname)
+            self.log_request_()
+            method()
+            self.log_response()
+            self.wfile.flush() #actually send the response if not already done.
+        except socket.timeout, e:
+            #a read or a write timed out.  Discard this connection
+            self.log_error("Request timed out: %r", e)
+            self.close_connection = 1
+            return
+
+
+class TestHTTPHandle(HTTPRequestHandler):
+
     def do_GET(self):
         self.body_len = 0
         self.chunked = False
