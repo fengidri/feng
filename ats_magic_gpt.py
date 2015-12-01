@@ -25,7 +25,7 @@ BLKPBSZGET=0x127b
 
 def ioctl_sector_size(fd):
     buf = array.array('c', [chr(0)] * 4)
-    fcntl.ioctl(fd, BLKPBSZGET, buf)
+    fcntl.ioctl(fd, BLKSSZGET, buf)
     return struct.unpack('I',buf)[0]
 
 def size(s):
@@ -61,13 +61,18 @@ def checkmagic(disks):
     for i in disks:
         if not os.path.exists(i):
             continue
-        m, nv, nf, nu, nd, nb =   head(i)
+        try:
+            m, nv, nf, nu, nd, nb =   head(i)
+        except IOError, e:
+            print i, e
+            continue
 
         print "%s: " % i,
         if m == 0xabcd1237:
             print "\033[31mOK ^_^\033[0m",
         else:
             print "\033[31mFail @_@\033[0m",
+
         print hex(m), nb, size((nb + 1) * BLOCK_SIZE)
 
 
@@ -112,9 +117,13 @@ def rmgpt(disks, do):
 
     count = 0
     for disk in disks:
-        if _rmgpt(disk, do):
-            count += 1
-            checkmagic([disk])
+        try:
+            if _rmgpt(disk, do):
+                count += 1
+                checkmagic([disk])
+        except IOError, e:
+            print disk, e
+
         print ""
     return count
 
@@ -146,24 +155,24 @@ def main():
 
     if sub == 'magic':
         checkmagic(args[2:])
-        return
 
-    if sub == 'rmgpt':
+    elif sub == 'rmgpt':
         do = False
         if len(args) == 3:
             if args[2] == 'YES':
                 do = True
 
         rmgpt(getdisks(['/usr/local/ats_422']), do)
-    if sub == 'scan':
+
+    elif sub == 'scan':
         stdou = sys.stdout
         sys.stdout = open('/dev/null', 'w')
         count = rmgpt(getdisks(['/usr/local/ats_422']), False)
         sys.stdout = stdou
         print count
-        return
 
-    print "ats.py [magic|rmgpt] <disks>"
+    else:
+        print "ats.py [magic|rmgpt] <disks>"
 
 
 main()
