@@ -15,13 +15,14 @@ def sizefmt(s):
 
 class SmapsSec(object):
     def __init__(self, lines):
-        line = lines[0]
+        line = lines[0].strip()
         tt = line.split(' ', 5)
         if len(tt) == 5:
             name = "anonymous"
         else:
             name = tt[-1].strip()
 
+        self.line = line
         self.name = name
 
         _start, _end = tt[0].split('-')
@@ -46,73 +47,23 @@ def parser_smaps(lines):
 def sum_smaps_handle(lines, S):
     secs = parser_smaps(lines)
 
-    max_len = 0
-    maps = {}
+    if S:
+        secs = sorted(secs, key = lambda a : a.rss, reverse = False)
+
+    sum_size = 0
+    malloc_size = 0
     for sec in secs:
-        name = sec.name
-        size = sec.rss
+        sum_size += sec.rss
+        print "%s %s %s" % (sizefmt(sec.rss).rjust(8),
+                sizefmt(sec.size).rjust(8), sec.line)
 
-        if name in maps:
-            maps[name] += size
-        else:
-            maps[name] = size
+        if sec.name == "anonymous" or sec.name == '[heap]':
+            malloc_size += sec.rss
 
-        if max_len < len(name):
-            max_len = len(name)
-
-    max_len += 4
-
-    show = []
-    for k, v in maps.items():
-        show.append((k.ljust(max_len), v))
-
-    if S:
-        show = sorted(show, key = lambda a : a[1], reverse = False)
-
-    sum_size = 0
-    for k, v in show:
-        print k, ': ', sizefmt(v)
-        sum_size += v
-
-    print "Mem Usage Total: %d: %s" % (sum_size, sizefmt(sum_size))
+    print "Mem Usage Total: RSS: %d: %s" % (sum_size, sizefmt(sum_size))
+    print "           Anonymous: %d: %s" % (malloc_size, sizefmt(malloc_size))
 
 
-def sum_handle(lines, S):
-    max_len = 0
-    maps = {}
-    for line in lines:
-        tt = line.split(' ', 5)
-        if len(tt) == 5:
-            name = "anonymous"
-        else:
-            name = tt[-1].strip()
-
-        _start, _end = tt[0].split('-')
-        size = int(_end, 16) - int(_start, 16)
-
-        if name in maps:
-            maps[name] += size
-        else:
-            maps[name] = size
-
-        if max_len < len(name):
-            max_len = len(name)
-
-    max_len += 4
-
-    show = []
-    for k, v in maps.items():
-        show.append((k.ljust(max_len), v))
-
-    if S:
-        show = sorted(show, key = lambda a : a[1], reverse = False)
-
-    sum_size = 0
-    for k, v in show:
-        print k, ': ', sizefmt(v)
-        sum_size += v
-
-    print "Mem Usage Total: %d: %s" % (sum_size, sizefmt(sum_size))
 
 
 def origin(lines, S):
@@ -141,13 +92,13 @@ def origin(lines, S):
 def main():
     handle = sum_smaps_handle
     filename = None
-    sort = True
+    sort = False
     for o in sys.argv[1:]:
         if o == '-o':
             handle = origin
             continue
-        if o == '--no-sort':
-            sort = False
+        if o == '--sort':
+            sort = True
             continue
         filename = o
     if not filename:
