@@ -57,14 +57,14 @@ def sum_smaps_handle(lines, S):
     anonymous = 0
     for sec in secs:
         sum_size += sec.rss
-        print "%s %s %s" % (sizefmt(sec.rss).rjust(8),
-                sizefmt(sec.size).rjust(8), sec.line)
+        #print "%s %s %s" % (sizefmt(sec.rss).rjust(8),
+        #        sizefmt(sec.size).rjust(8), sec.line)
 
         if sec.name == "anonymous":
             anonymous += sec.res
 
         if  sec.name == '[heap]':
-            malloc_size += sec.rss
+            malloc_size += sec.res
 
         if sec.name.find('[stack') > -1:
             stack += sec.res
