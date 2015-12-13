@@ -52,16 +52,29 @@ def sum_smaps_handle(lines, S):
 
     sum_size = 0
     malloc_size = 0
+    stack = 0
+    stack_num = 0
+    anonymous = 0
     for sec in secs:
         sum_size += sec.rss
         print "%s %s %s" % (sizefmt(sec.rss).rjust(8),
                 sizefmt(sec.size).rjust(8), sec.line)
 
-        if sec.name == "anonymous" or sec.name == '[heap]':
+        if sec.name == "anonymous":
+            anonymous += sec.res
+
+        if  sec.name == '[heap]':
             malloc_size += sec.rss
 
-    print "Mem Usage Total: RSS: %d: %s" % (sum_size, sizefmt(sum_size))
-    print "           Anonymous: %d: %s" % (malloc_size, sizefmt(malloc_size))
+        if sec.name.find('[stack') > -1:
+            stack += sec.res
+            stack_num += 1
+
+
+    print "Total: RSS: %d: %s" % (sum_size, sizefmt(sum_size))
+    print "malloc:     %d: %s" % (malloc_size, sizefmt(malloc_size))
+    print "Anonymous:  %d: %s" % (Anonymous, sizefmt(Anonymous))
+    print "stack:      %d: %s  // %d" % (stack, sizefmt(stack), stack_num)
 
 
 
