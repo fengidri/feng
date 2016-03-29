@@ -40,9 +40,9 @@ class Xplot(object):
                 wins_x.append(float(t[1]))
                 wins_y.append(int(t[4]))
 
-        self.plt.plot(seqs_x, seqs_y, 'r')
-        self.plt.plot(acks_x, acks_y, 'g')
-        self.plt.plot(wins_x, wins_y, 'b')
+        self.plt.plot(seqs_x, seqs_y, 'rx-', linewidth=0.1,  markersize=0.2)
+        self.plt.plot(acks_x, acks_y, 'gx-', linewidth=0.1,  markersize=0.2)
+        self.plt.plot(wins_x, wins_y, 'bx-', linewidth=0.1,  markersize=0.2)
 
     def save(self, out):
         self.plt.savefig(out)
