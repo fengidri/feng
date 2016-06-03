@@ -409,6 +409,7 @@ def main():
 VALUE_SELECT = 1
 VALUE_SIZE = 2
 VALUE_INFO = 3
+VALUE_STRING = 4
 
 def format_sectors(x):
     '''Pretty print a sector count.'''
@@ -455,11 +456,14 @@ class Base(object):
         for filename, showname, tp in self.attrs:
             i += 1
             if tp == VALUE_SIZE:
-                v = open(os.path.join(self.path, filename)).read()
+                v = open(os.path.join(self.path, filename)).read().strip()
                 v = float(v)
 
+            if tp == VALUE_STRING:
+                v = open(os.path.join(self.path, filename)).read().strip()
+
             if tp == VALUE_SELECT:
-                v = open(os.path.join(self.path, filename)).read()
+                v = open(os.path.join(self.path, filename)).read().strip()
                 t = v.split()
                 for tt in t:
                     if tt[0] == '[':
@@ -522,7 +526,7 @@ class CacheBdev(Base):
         self.attrs = []
         self.attrs.append(['../size',   'Size',       VALUE_SIZE])
         self.attrs.append(['cache_mode', 'Cache Mode', VALUE_SELECT])
-        self.attrs.append(['dirty_data', 'Dirty Data', VALUE_SIZE])
+        self.attrs.append(['dirty_data', 'Dirty Data', VALUE_STRING])
 
         self.real_dev = path.split('/')[-2]
         self.path = path
