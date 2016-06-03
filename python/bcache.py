@@ -460,10 +460,14 @@ class Base(object):
                 v = open(os.path.join(self.path, filename)).read().strip()
                 v = float(v)
 
-            if tp == VALUE_STRING:
+            elif tp == VALUE_INT:
+                v = open(os.path.join(self.path, filename)).read().strip()
+                v = int(v)
+
+            elif tp == VALUE_STRING:
                 v = open(os.path.join(self.path, filename)).read().strip()
 
-            if tp == VALUE_SELECT:
+            elif tp == VALUE_SELECT:
                 v = open(os.path.join(self.path, filename)).read().strip()
                 t = v.split()
                 for tt in t:
@@ -471,13 +475,15 @@ class Base(object):
                         v = tt[1:-1]
                         break
 
-            if tp == VALUE_INFO:
+            elif tp == VALUE_INFO:
                 filename, key = filename.split('|')
                 for line in open(os.path.join(self.path, filename)).readlines():
                     k, v = line.split(':')
                     if k.strip() == key:
                         v = v.strip()
                         break
+            else:
+                continue
 
             self.attrs[i].append(v)
 
@@ -518,6 +524,28 @@ class CacheSet(Base):
                 self.cdev.append(CacheCdev(p))
                 continue
         self.read_value()
+
+    def print_value(self):
+        Base.print_value(self)
+
+        for c in self.cdev:
+            c.print_value()
+
+
+        info = [['']]
+        for b in s.bdev[0].attrs:
+            info.append([b[1].ljust(15)])
+
+        for b in s.bdev:
+            info[0].append(b.real_dev)
+            for i, v in enumerate(b.attrs):
+                info[i + 1].append(v.rjust(5))
+
+        for i in info:
+            print ' '.join(i)
+
+
+
 
 
 
@@ -566,13 +594,6 @@ def main():
 
     for s in sets:
         s.print_value()
-
-        for c in s.cdev:
-            c.print_value()
-
-        for b in s.bdev:
-            b.print_value()
-
 
 
 
