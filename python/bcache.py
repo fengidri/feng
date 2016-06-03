@@ -450,7 +450,6 @@ def interpret_sectors(x):
 
 
 class Base(object):
-    attrs = []
     def read_value(self):
         i = -1
         for filename, showname, tp in self.attrs:
@@ -489,8 +488,9 @@ class Base(object):
 
 
 class CacheSet(Base):
-    attrs = []
     def __init__(self, path):
+        self.attrs = []
+
         self.bdev = []
         self.cdev = []
         self.uuid = os.path.basename(path)
@@ -517,12 +517,13 @@ class CacheSet(Base):
 
 
 class CacheBdev(Base):
-    attrs = []
-    attrs.append(['../size',   'Size',       VALUE_SIZE])
-    attrs.append(['cache_mode', 'Cache Mode', VALUE_SELECT])
-    attrs.append(['dirty_data', 'Dirty Data', VALUE_SIZE])
 
     def __init__(self, path):
+        self.attrs = []
+        self.attrs.append(['../size',   'Size',       VALUE_SIZE])
+        self.attrs.append(['cache_mode', 'Cache Mode', VALUE_SELECT])
+        self.attrs.append(['dirty_data', 'Dirty Data', VALUE_SIZE])
+
         self.real_dev = path.split('/')[-2]
         self.path = path
         self.read_value()
@@ -551,12 +552,13 @@ class CacheBdev(Base):
 
 
 class CacheCdev(Base):
-    attrs = []
-    attrs.append(['../size',   'Size',       VALUE_SIZE])
-    attrs.append(['cache_replacement_policy', 'Replace Policy', VALUE_SELECT])
-    attrs.append(['priority_stats|Unused', 'Unused', VALUE_INFO])
 
     def __init__(self, path):
+        self.attrs = []
+        self.attrs.append(['../size',   'Size',       VALUE_SIZE])
+        self.attrs.append(['cache_replacement_policy', 'Replace Policy', VALUE_SELECT])
+        self.attrs.append(['priority_stats|Unused', 'Unused', VALUE_INFO])
+
         self.real_dev = path.split('/')[-2]
         self.path = path
         self.read_value()
