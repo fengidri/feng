@@ -410,6 +410,7 @@ VALUE_SELECT = 1
 VALUE_SIZE = 2
 VALUE_INFO = 3
 VALUE_STRING = 4
+VALUE_INT = 5
 
 def format_sectors(x):
     '''Pretty print a sector count.'''
@@ -527,32 +528,14 @@ class CacheBdev(Base):
         self.attrs.append(['../size',   'Size',       VALUE_SIZE])
         self.attrs.append(['cache_mode', 'Cache Mode', VALUE_SELECT])
         self.attrs.append(['dirty_data', 'Dirty Data', VALUE_STRING])
+        self.attrs.append(['stats_five_minute/cache_hits', 'HITS', VALUE_INT])
+        self.attrs.append(['stats_five_minute/cache_misses', 'MISSES', VALUE_INT])
+        self.attrs.append(['stats_five_minute/cache_hit_ratio', 'RATIO', VALUE_INT])
 
         self.real_dev = path.split('/')[-2]
         self.path = path
         self.read_value()
         self.name = '--- Backing Device: %s ---' % self.real_dev
-
-    def stats(self):
-        path = 'stats_total'
-        path = os.path.join(self.path, path)
-
-        t1 = ['cache_hits', 'cache_misses', 'cache_hit_ratio' ]
-        t2 = ['HITS',       'MISSES',       'RATIO'           ]
-        t3 = [0,            0,              0                 ]
-
-        for i, f in enumerate(t1):
-            p = os.path.join(path, f)
-            t3[i] = open(p).read().strip()
-
-        w = max(map(len, t2))
-
-        print '  ', ' '.join([x.rjust(w) for x in t2])
-        print '  ', ' '.join([x.rjust(w) for x in t3])
-
-    def print_value(self):
-        Base.print_value(self)
-        self.stats()
 
 
 class CacheCdev(Base):
