@@ -451,25 +451,27 @@ def interpret_sectors(x):
         return 1
 
 
+
 class Base(object):
+    def getvalue(self, filename):
+        return open(os.path.join(self.path, filename)).read().strip()
+
     def read_value(self):
         i = -1
         for filename, showname, tp in self.attrs:
             i += 1
             if tp == VALUE_SIZE:
-                v = open(os.path.join(self.path, filename)).read().strip()
-                v = float(v)
+                v = float(self.getvalue(filename))
+                v = format_sectors(v)
 
             elif tp == VALUE_INT:
-                v = open(os.path.join(self.path, filename)).read().strip()
-                v = int(v)
+                v = int(self.getvalue(filename))
 
             elif tp == VALUE_STRING:
-                v = open(os.path.join(self.path, filename)).read().strip()
+                v = self.getvalue(filename)
 
             elif tp == VALUE_SELECT:
-                v = open(os.path.join(self.path, filename)).read().strip()
-                t = v.split()
+                t = self.getvalue(filename).split()
                 for tt in t:
                     if tt[0] == '[':
                         v = tt[1:-1]
@@ -492,9 +494,6 @@ class Base(object):
 
         for item in self.attrs:
             v = item[-1]
-            if item[2] == VALUE_SIZE:
-                v =  format_sectors(v)
-
             print '    ', item[1].ljust(15), ':', v
 
 
@@ -531,18 +530,34 @@ class CacheSet(Base):
         for c in self.cdev:
             c.print_value()
 
+        print '--- Backing Device ---'
 
-        info = [['']]
-        for b in s.bdev[0].attrs:
-            info.append([b[1].ljust(15)])
 
-        for b in s.bdev:
+        info = [['Disk']]
+        for b in self.bdev[0].attrs:
+            info.append([b[1]])
+
+        for b in self.bdev:
             info[0].append(b.real_dev)
             for i, v in enumerate(b.attrs):
-                info[i + 1].append(v.rjust(5))
+                info[i + 1].append(str(v[-1]))
+
+        num = 0
+        while num < len(info[0]):
+            def _h(x):
+                if 0 == num:
+                    v = x[num].ljust(w) + ':'
+                else:
+                    v = x[num].ljust(w)
+                x[num] = v
+
+
+            w = max(map(lambda x:len(x[num]), info))
+            map(_h, info)
+            num += 1
 
         for i in info:
-            print ' '.join(i)
+            print '    ', ' '.join(i)
 
 
 
