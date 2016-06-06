@@ -4,9 +4,11 @@
 #    email     :   fengidri@yeah.net
 #    version   :   1.0.1
 
+#$nc 115.231.101.165 999 < bcache.py
 
 import os
 import re
+import copy
 
 def fun_get_backings():
     bcaches = []
@@ -407,26 +409,44 @@ def main():
                 fd.write('1\n')
 
 VALUE_SELECT = 1
-VALUE_SIZE = 2
-VALUE_INFO = 3
+VALUE_SIZE   = 2
+VALUE_INFO   = 3
 VALUE_STRING = 4
-VALUE_INT = 5
+VALUE_INT    = 5
+VALUE_ATTR   = 6
+
+ATTRS_BDEV = []
+ATTRS_CDEV = []
+
+ATTRS_BDEV.append(['real_dev',                           'Disk',     VALUE_ATTR])
+ATTRS_BDEV.append(['name',                               'Bdev',     VALUE_ATTR])
+ATTRS_BDEV.append(['cache_mode',                         'Mode',     VALUE_SELECT])
+ATTRS_BDEV.append(['../size',                            'Size',     VALUE_SIZE])
+ATTRS_BDEV.append(['dirty_data',                         'Dirty',    VALUE_STRING])
+ATTRS_BDEV.append(['stats_five_minute/cache_hits',       'HIT',      VALUE_INT])
+ATTRS_BDEV.append(['stats_five_minute/cache_misses',     'MISS',     VALUE_INT])
+ATTRS_BDEV.append(['stats_five_minute/cache_hit_ratio',  'RATIO',    VALUE_INT])
+
+ATTRS_CDEV.append(['real_dev',                           'Disk',     VALUE_ATTR])
+ATTRS_CDEV.append(['../size',                            'Size',     VALUE_SIZE])
+ATTRS_CDEV.append(['cache_replacement_policy',           'Replace',  VALUE_SELECT])
+ATTRS_CDEV.append(['priority_stats|Unused',              'Unused',   VALUE_INFO])
 
 def format_sectors(x):
     '''Pretty print a sector count.'''
-    sectors = int(x)
+    sectors = float(x)
     asectors = abs(sectors)
 
     if asectors == 0:
         return '0B'
     elif asectors < 2048:
-        return '%.2fKiB' % (sectors / 2)
+        return '%.1fK' % (sectors / 2)
     elif asectors < 2097152:
-        return '%.2fMiB' % (sectors / 2048)
+        return '%.1fM' % (sectors / 2048)
     elif asectors < 2147483648:
-        return '%.2fGiB' % (sectors / 2097152)
+        return '%.1fG' % (sectors / 2097152)
     else:
-        return '%.2fTiB' % (sectors / 2147483648)
+        return '%.1fT' % (sectors / 2147483648)
 
 def interpret_sectors(x):
     '''Interpret a pretty-printed disk size.'''
@@ -450,6 +470,53 @@ def interpret_sectors(x):
     else:
         return 1
 
+class OUTBuffer(object):
+    def __init__(self):
+        self.lines = []
+        self.cur_col = 0
+        self.cur_row = 0
+
+    def write(self, word):
+        while True:
+            if len(self.lines) <= self.cur_row:
+                self.lines.append([])
+            else:
+                break
+
+        for line in self.lines:
+            while len(line) - 1 < self.cur_col:
+                line.append('')
+
+        self.lines[self.cur_row][self.cur_col] = word
+
+
+    def write_col(self, word):
+        self.write(word)
+        self.cur_row += 1
+
+    def write_row(self, word):
+        self.write(word)
+        self.cur_col += 1
+
+    def out(self):
+        def _h(x):
+            v = x[num].ljust(w)
+            x[num] = v
+
+        if not self.lines:
+            return
+
+        num = 0
+        while num < len(self.lines[0]):
+
+            w = max(map(lambda x:len(x[num]), self.lines))
+            map(_h, self.lines)
+            num += 1
+
+        for row in self.lines:
+            print ' '.join(row)
+
+outbuffer = OUTBuffer()
 
 
 class Base(object):
@@ -469,6 +536,9 @@ class Base(object):
 
             elif tp == VALUE_STRING:
                 v = self.getvalue(filename)
+
+            elif tp == VALUE_ATTR:
+                v = getattr(self, filename)
 
             elif tp == VALUE_SELECT:
                 t = self.getvalue(filename).split()
@@ -490,14 +560,13 @@ class Base(object):
             self.attrs[i].append(v)
 
     def print_value(self, filter = None):
-        print self.name
-
         for item in self.attrs:
-            v = item[-1]
-            print '    ', item[1].ljust(15), ':', v
+            outbuffer.write_col(str(item[-1]))
+
 
 
 class CacheSet(Base):
+    PrintInit = False
     def __init__(self, path):
         self.attrs = []
 
@@ -525,39 +594,33 @@ class CacheSet(Base):
         self.read_value()
 
     def print_value(self):
-        Base.print_value(self)
+        if not CacheSet.PrintInit:
+            CacheSet.PrintInit = True
+            for t in ATTRS_CDEV:
+                outbuffer.write_col(t[1] + ':')
+
+            outbuffer.write_col('')
+            for t in ATTRS_BDEV:
+                outbuffer.write_col(t[1] + ':')
+            outbuffer.cur_row = 0
+            outbuffer.cur_col += 1
+
+
+        #Base.print_value(self)
 
         for c in self.cdev:
             c.print_value()
 
-        print '--- Backing Device ---'
 
-
-        info = [['Disk']]
-        for b in self.bdev[0].attrs:
-            info.append([b[1]])
-
+        outbuffer.write_col('')
+        row = outbuffer.cur_row
         for b in self.bdev:
-            info[0].append(b.real_dev)
-            for i, v in enumerate(b.attrs):
-                info[i + 1].append(str(v[-1]))
+            b.print_value()
 
-        num = 0
-        while num < len(info[0]):
-            def _h(x):
-                if 0 == num:
-                    v = x[num].ljust(w) + ':'
-                else:
-                    v = x[num].ljust(w)
-                x[num] = v
+            outbuffer.cur_row = row
+            outbuffer.cur_col += 1
 
 
-            w = max(map(lambda x:len(x[num]), info))
-            map(_h, info)
-            num += 1
-
-        for i in info:
-            print '    ', ' '.join(i)
 
 
 
@@ -565,17 +628,12 @@ class CacheSet(Base):
 
 
 class CacheBdev(Base):
-
     def __init__(self, path):
-        self.attrs = []
-        self.attrs.append(['../size',   'Size',       VALUE_SIZE])
-        self.attrs.append(['cache_mode', 'Cache Mode', VALUE_SELECT])
-        self.attrs.append(['dirty_data', 'Dirty Data', VALUE_STRING])
-        self.attrs.append(['stats_five_minute/cache_hits', 'HITS', VALUE_INT])
-        self.attrs.append(['stats_five_minute/cache_misses', 'MISSES', VALUE_INT])
-        self.attrs.append(['stats_five_minute/cache_hit_ratio', 'RATIO', VALUE_INT])
+        self.attrs = copy.deepcopy(ATTRS_BDEV)
 
         self.real_dev = path.split('/')[-2]
+        self.name = os.path.basename(os.readlink(os.path.join(path, 'dev')))
+
         self.path = path
         self.read_value()
         self.name = '--- Backing Device: %s ---' % self.real_dev
@@ -584,17 +642,27 @@ class CacheBdev(Base):
 class CacheCdev(Base):
 
     def __init__(self, path):
-        self.attrs = []
-        self.attrs.append(['../size',   'Size',       VALUE_SIZE])
-        self.attrs.append(['cache_replacement_policy', 'Replace Policy', VALUE_SELECT])
-        self.attrs.append(['priority_stats|Unused', 'Unused', VALUE_INFO])
+        self.attrs = copy.deepcopy(ATTRS_CDEV)
 
         self.real_dev = path.split('/')[-2]
+
         self.path = path
         self.read_value()
         self.name = '--- Cache Device: %s ---' % self.real_dev
 
 
+
+
+def status(sets):
+
+
+
+    for s in sets:
+        s.print_value()
+        outbuffer.cur_row = 0
+        outbuffer.cur_col += 1
+
+    outbuffer.out()
 
 
 
@@ -607,9 +675,9 @@ def main():
         sets.append(CacheSet(cache_dir))
 
 
-    for s in sets:
-        s.print_value()
-        print ''
+    status(sets)
+
+
 
 
 
