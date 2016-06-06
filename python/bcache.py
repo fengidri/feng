@@ -4,7 +4,7 @@
 #    email     :   fengidri@yeah.net
 #    version   :   1.0.1
 
-#$nc 115.231.101.165 999 < bcache.py
+#$nc 10.0.5.180 999 < bcache.py
 
 import os
 import re
@@ -162,7 +162,6 @@ import sys
 import argparse
 
 MAX_KEY_LENGTH    = 28
-DEV_BLOCK_PATH    = '/dev/block/'
 SYSFS_BCACHE_PATH = '/sys/fs/bcache/'
 
 def file_to_lines(fname):
@@ -516,6 +515,10 @@ class OUTBuffer(object):
         for row in self.lines:
             print ' '.join(row)
 
+        self.lines = []
+        self.cur_col = 0
+        self.cur_row = 0
+
 outbuffer = OUTBuffer()
 
 
@@ -591,6 +594,7 @@ class CacheSet(Base):
                 p = os.path.join(path, p)
                 self.cdev.append(CacheCdev(p))
                 continue
+
         self.read_value()
 
     def print_value(self):
@@ -606,8 +610,6 @@ class CacheSet(Base):
             outbuffer.cur_col += 1
 
 
-        #Base.print_value(self)
-
         for c in self.cdev:
             c.print_value()
 
@@ -621,6 +623,8 @@ class CacheSet(Base):
             outbuffer.cur_col += 1
 
 
+        outbuffer.cur_col += 1
+        outbuffer.cur_row = 0
 
 
 
@@ -653,17 +657,6 @@ class CacheCdev(Base):
 
 
 
-def status(sets):
-
-
-
-    for s in sets:
-        s.print_value()
-        outbuffer.cur_row = 0
-        outbuffer.cur_col += 1
-
-    outbuffer.out()
-
 
 
 def main():
@@ -673,9 +666,43 @@ def main():
         if not os.path.isdir(cache_dir):
             continue
         sets.append(CacheSet(cache_dir))
+    for s in sets:
+        s.print_value()
+
+    outbuffer.out()
+
+    orphan = []
+    SYS_BLOCK_PATH = '/sys/block'
+    for b in os.listdir(SYS_BLOCK_PATH):
+        if not b.startswith('bcache'):
+            continue
+
+        p1 = '%s/%s/bcache' % (SYS_BLOCK_PATH, b)
+        p2 = '%s/%s/bcache/cache' % (SYS_BLOCK_PATH, b)
+
+        if not os.path.isdir(p1):
+            continue
+
+        if os.path.isdir(p2):
+            continue
+
+        p = '%s/%s/%s' % (SYS_BLOCK_PATH, b, os.readlink(p1))
+
+        orphan.append(CacheBdev(p))
+
+    if orphan:
+        print '---- orphan backing drivece ----'
+        for t in ATTRS_BDEV:
+            outbuffer.write_col(t[1] + ':')
+
+        outbuffer.cur_col += 1
+        outbuffer.cur_row = 0
+        for b in orphan:
+            b.print_value()
+        outbuffer.out()
 
 
-    status(sets)
+
 
 
 
