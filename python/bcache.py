@@ -609,6 +609,7 @@ def main():
 
     for s in sets:
         s.print_value()
+        print ''
 
 
 
