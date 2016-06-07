@@ -666,6 +666,13 @@ def main():
         if not os.path.isdir(cache_dir):
             continue
         sets.append(CacheSet(cache_dir))
+
+    for s in sets:
+        devs = [c.real_dev for c in s.cdev]
+        print 'CSET UUID: %s -- %s' % (s.uuid, ','.join(devs))
+    print ''
+
+
     for s in sets:
         s.print_value()
 
@@ -699,6 +706,8 @@ def main():
         outbuffer.cur_row = 0
         for b in orphan:
             b.print_value()
+            outbuffer.cur_col += 1
+            outbuffer.cur_row = 0
         outbuffer.out()
 
 
