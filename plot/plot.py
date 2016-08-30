@@ -33,6 +33,9 @@ opt_xlabel = "Time"
 opt_ylabel = "SlowRate"
 #####################################################
 
+import matplotlib as mpl
+mpl.use("Agg")
+
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator, FuncFormatter
 
